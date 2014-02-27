@@ -13,6 +13,7 @@ using std::max;
 namespace caffe
 {
 
+<<<<<<< HEAD
   template<typename Dtype>
   void SoftmaxWithLossLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
                                           vector<Blob<Dtype>*>* top)
@@ -24,6 +25,18 @@ namespace caffe
     softmax_top_vec_.push_back(&prob_);
     softmax_layer_->SetUp(softmax_bottom_vec_, &softmax_top_vec_);
   };
+=======
+template <typename Dtype>
+void SoftmaxWithLossLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top) {
+  CHECK_EQ(bottom.size(), 2) << "SoftmaxLoss Layer takes two blobs as input.";
+  CHECK_EQ(top->size(), 0) << "SoftmaxLoss Layer takes no blob as output.";
+  softmax_bottom_vec_.clear();
+  softmax_bottom_vec_.push_back(bottom[0]);
+  softmax_top_vec_.push_back(&prob_);
+  softmax_layer_->SetUp(softmax_bottom_vec_, &softmax_top_vec_);
+};
+>>>>>>> 0a20e498651ba1aa5e4ba3a742f39637ef9451be
 
   template<typename Dtype>
   void SoftmaxWithLossLayer<Dtype>::Forward_cpu(

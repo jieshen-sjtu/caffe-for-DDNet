@@ -10,6 +10,7 @@
 #include "caffe/layer.hpp"
 #include "caffe/net.hpp"
 #include "caffe/util/io.hpp"
+#include "caffe/util/insert_splits.hpp"
 
 using std::cerr;
 using std::endl;
@@ -26,12 +27,42 @@ namespace caffe
     Init(param);
   }
 
+<<<<<<< HEAD
   template<typename Dtype>
   Net<Dtype>::Net(const string& param_file)
   {
     NetParameter param;
     ReadProtoFromTextFile(param_file, &param);
     Init(param);
+=======
+template <typename Dtype>
+void Net<Dtype>::Init(const NetParameter& in_param) {
+  // Create a copy of in_param with splits added where necessary.
+  NetParameter param;
+  insert_splits(in_param, &param);
+  // Basically, build all the layers and set up its connections.
+  name_ = param.name();
+  map<string, int> blob_name_to_idx;
+  set<string> available_blobs;
+  int num_layers = param.layers_size();
+  CHECK_EQ(param.input_size() * 4, param.input_dim_size())
+      << "Incorrect bottom blob dimension specifications.";
+  // set the input blobs
+  for (int i = 0; i < param.input_size(); ++i) {
+    const string& blob_name = param.input(i);
+    shared_ptr<Blob<Dtype> > blob_pointer(
+        new Blob<Dtype>(param.input_dim(i * 4),
+                        param.input_dim(i * 4 + 1),
+                        param.input_dim(i * 4 + 2),
+                        param.input_dim(i * 4 + 3)));
+    blobs_.push_back(blob_pointer);
+    blob_names_.push_back(blob_name);
+    blob_need_backward_.push_back(param.force_backward());
+    net_input_blob_indices_.push_back(i);
+    net_input_blobs_.push_back(blob_pointer.get());
+    blob_name_to_idx[blob_name] = i;
+    available_blobs.insert(blob_name);
+>>>>>>> 0a20e498651ba1aa5e4ba3a742f39637ef9451be
   }
 
   template<typename Dtype>
