@@ -103,3 +103,4 @@ git push origin feature
 Now make a pull request! You can do this from the command line (`git pull-request -b dev`) if you install [hub](https://github.com/github/hub).
 
 The pull request of `feature` into `dev` will be a clean merge. Applause.
+
