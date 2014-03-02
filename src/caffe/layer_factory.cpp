@@ -68,6 +68,10 @@ namespace caffe {
     {
       return new LLCEuclideanLossLayer<Dtype>(param);
     }
+    else if (type == "llc_accuracy")
+    {
+      return new LLCAccuracyLayer<Dtype>(param);
+    }
     else
     {
       LOG(FATAL)<< "Unknown layer name: " << type;

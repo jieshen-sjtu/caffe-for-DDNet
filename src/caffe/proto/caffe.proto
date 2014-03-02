@@ -30,6 +30,8 @@ message Datum {
   // LLC patch data
   optional int32 llc_dim = 11;
   repeated float llc_codes = 12 [packed=true];
+  optional int32 llc_xid = 13;
+  optional int32 llc_yid = 14;
 
   optional string img_name = 20;
 }
@@ -118,6 +120,9 @@ message NetParameter {
   // If set False, then whether to carry out backward is determined
   // automatically according to the net structure and learning rates.
   optional bool force_backward = 5 [ default = false ];
+
+  optional string blob_name_for_deep_feat = 6;
+  optional string blob_name_for_deep_code = 7;
 }
 
 message SolverParameter {

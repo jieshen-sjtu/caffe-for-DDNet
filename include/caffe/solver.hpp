@@ -3,10 +3,24 @@
 #ifndef CAFFE_OPTIMIZATION_SOLVER_HPP_
 #define CAFFE_OPTIMIZATION_SOLVER_HPP_
 
+#include <boost/shared_ptr.hpp>
+#include <caffe/proto/caffe.pb.h>
+#include <caffe/common.hpp>
+#include <caffe/blob.hpp>
+
+
 #include <vector>
+#include <string>
+using boost::shared_ptr;
+using std::vector;
+using std::string;
 
 namespace caffe
 {
+  class SolverParameter;
+
+  template<typename Dtype>
+  class Net;
 
   template<typename Dtype>
   class Solver
@@ -55,7 +69,7 @@ namespace caffe
     shared_ptr<Net<Dtype> > net_;
     shared_ptr<Net<Dtype> > test_net_;
 
-    DISABLE_COPY_AND_ASSIGN (Solver);
+  DISABLE_COPY_AND_ASSIGN (Solver);
   };
 
   template<typename Dtype>
@@ -76,23 +90,25 @@ namespace caffe
     // history maintains the historical momentum data.
     vector<shared_ptr<Blob<Dtype> > > history_;
 
-    DISABLE_COPY_AND_ASSIGN (SGDSolver);
+  DISABLE_COPY_AND_ASSIGN (SGDSolver);
   };
 
+  /*
   template<typename Dtype>
-  class LLCSGDSolver: public SGDSolver<Dtype>
+  class LLCSGDSolver: public caffe::SGDSolver<Dtype>
   {
   public:
-    explicit LLCSGDSolver(const SolverParameter& param)
-        : SGDSolver<Dtype>(param)
+    explicit LLCSGDSolver(const caffe::SolverParameter& param)
+        : caffe::SGDSolver<Dtype>(param)
     {
     }
 
   public:
     virtual void Solve(const char* resume_file = NULL);
 
-    DISABLE_COPY_AND_ASSIGN (LLCSGDSolver);
+  DISABLE_COPY_AND_ASSIGN (LLCSGDSolver);
   };
+  */
 
 }  // namspace caffe
 

@@ -314,8 +314,6 @@ namespace caffe
     }
   }
 
-
-
   INSTANTIATE_CLASS(Solver);
   INSTANTIATE_CLASS(SGDSolver);
 

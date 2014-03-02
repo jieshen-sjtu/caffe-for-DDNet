@@ -36,6 +36,9 @@ namespace caffe
     //Dtype* top_label = layer->prefetch_label_->mutable_cpu_data();
     Dtype* top_llc_codes = layer->prefetch_llc_codes_->mutable_cpu_data();
 
+    vector<int>& xid_vecs = layer->prefetch_llc_xid_;
+    vector<int>& yid_vecs = layer->prefetch_llc_yid_;
+
     const Dtype scale = layer->layer_param_.scale();
     const int batchsize = layer->layer_param_.batchsize();
     const int cropsize = layer->layer_param_.cropsize();
@@ -140,6 +143,9 @@ namespace caffe
       //top_label[itemid] = datum.label();
 
       // fetch patch data
+      xid_vecs[itemid] = datum.llc_xid();
+      yid_vecs[itemid] = datum.llc_yid();
+
       for (int j = 0; j < llc_dim; ++j)
         top_llc_codes[itemid * llc_dim + j] = static_cast<Dtype>(datum.llc_codes(
             j));
@@ -251,6 +257,9 @@ namespace caffe
      */
 
     // LLC code
+    prefetch_llc_xid_.resize(this->layer_param_.batchsize(), 0);
+    prefetch_llc_yid_.resize(this->layer_param_.batchsize(), 0);
+
     (*top)[1]->Reshape(this->layer_param_.batchsize(), datum.llc_dim(), 1, 1);
     prefetch_llc_codes_.reset(new Blob<Dtype>(this->layer_param_.batchsize(), datum.llc_dim(), 1, 1));
     LOG(INFO) << "output LLC code size: " << (*top)[1]->num() << ","
