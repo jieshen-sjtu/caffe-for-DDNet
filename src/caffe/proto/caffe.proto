@@ -30,8 +30,13 @@ message Datum {
   // LLC patch data
   optional int32 llc_dim = 11;
   repeated float llc_codes = 12 [packed=true];
-  optional int32 llc_xid = 13;
-  optional int32 llc_yid = 14;
+
+  repeated int32 llc_xid = 13 [packed=true];
+  repeated int32 llc_yid = 14 [packed=true];
+
+  optional int32 patch_width = 15;
+  optional int32 patch_height = 16;
+  optional int32 num_patch = 17;
 
   optional string img_name = 20;
 }
@@ -99,6 +104,11 @@ message LayerParameter {
   // point would be set as rand_skip * rand(0,1). Note that rand_skip should not
   // be larger than the number of keys in the leveldb.
   optional uint32 rand_skip = 53 [ default = 0 ];
+
+  // for spm layer
+  optional uint32 spm_level = 54 [default = 2];
+  optional uint32 num_patch = 55 [default = 16];
+  optional bool hor_pool = 56 [default = false];
 }
 
 message LayerConnection {
