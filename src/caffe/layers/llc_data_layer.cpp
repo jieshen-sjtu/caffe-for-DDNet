@@ -59,6 +59,16 @@ namespace caffe
     const int patch_size = layer->patch_size_;
     const int num_patch = layer->num_patch_;
 
+    // check num_patch is a power of 4
+    {
+      int tmp = num_patch;
+      while (tmp != 0 && tmp != 1)
+      {
+        tmp = tmp >> 2;
+      }
+      CHECK_EQ(tmp, 1)<< "num patch should be a power of 4";
+    }
+
     // patch setting
     const int llc_dim = layer->llc_dim_;
 
