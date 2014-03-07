@@ -179,6 +179,30 @@ namespace caffe
     blob_name_for_deep_code_ = param.blob_name_for_deep_code();
     blob_id_for_deep_code_ = blob_name_to_idx[blob_name_for_deep_code_];
 
+    need_fine_tune_ = param.need_fine_tune();
+
+    if (!param.has_last_layer_name_for_unsup())
+    {
+      last_layer_name_for_unsup_ = layer_names_[layer_names_.size() - 1];
+      last_layer_id_for_unsup_ = layer_names_.size() - 1;
+    } else
+    {
+      last_layer_name_for_unsup_ = param.last_layer_name_for_unsup();
+      last_layer_id_for_unsup_ = -1;
+      for (size_t i = 0; i < layer_names_.size(); ++i)
+        if (layer_names_[i] == last_layer_name_for_unsup_)
+        {
+          last_layer_id_for_unsup_ = i;
+          break;
+        }
+      CHECK(last_layer_id_for_unsup_ != -1) << "No layer named "
+                                            << last_layer_name_for_unsup_;
+    }
+
+    start_fine_tune_ = false;
+
+    endlayer_ = last_layer_id_for_unsup_ + 1;
+    has_set_fine_tune_ = false;
     LOG(INFO)<< "Network initialization done.";
   }
 
@@ -232,13 +256,36 @@ namespace caffe
   }
 
   template<typename Dtype>
+  void Net<Dtype>::set_start_fine_tune()
+  {
+    if (!need_fine_tune_)
+      return;
+
+    start_fine_tune_ = true;
+    has_set_fine_tune_ = true;
+    endlayer_ = layers_.size();
+    for (size_t i = 0; i < endlayer_; ++i)
+      layers_[i]->set_start_fine_tune(start_fine_tune_);
+  }
+
+  template<typename Dtype>
   const vector<Blob<Dtype>*>& Net<Dtype>::ForwardPrefilled()
   {
-    for (int i = 0; i < layers_.size(); ++i)
+
+    /*
+     for (int i = 0; i < layers_.size(); ++i)
+     {
+     // LOG(ERROR) << "Forwarding " << layer_names_[i];
+     layers_[i]->Forward(bottom_vecs_[i], &top_vecs_[i]);
+     }
+     */
+
+    for (int i = 0; i < endlayer_; ++i)
     {
       // LOG(ERROR) << "Forwarding " << layer_names_[i];
       layers_[i]->Forward(bottom_vecs_[i], &top_vecs_[i]);
     }
+
     return net_output_blobs_;
   }
 
@@ -281,8 +328,10 @@ namespace caffe
   template<typename Dtype>
   Dtype Net<Dtype>::Backward()
   {
+
     Dtype loss = 0;
-    for (int i = layers_.size() - 1; i >= 0; --i)
+    //for (int i = layers_.size() - 1; i >= 0; --i)
+    for (int i = endlayer_ - 1; i >= 0; --i)
     {
       if (layer_need_backward_[i])
       {
@@ -292,6 +341,7 @@ namespace caffe
       }
     }
     return loss;
+
   }
 
   template<typename Dtype>

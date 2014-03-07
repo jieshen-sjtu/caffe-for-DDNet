@@ -138,7 +138,8 @@ message NetParameter {
   optional string blob_name_for_deep_code = 7;
 
   // for fine tune
-  optional string last_layer_name_for_unsup = 20;
+  optional bool need_fine_tune = 9 [default = false];
+  optional string last_layer_name_for_unsup = 10;
 }
 
 message SolverParameter {
