@@ -112,6 +112,7 @@ message LayerParameter {
 
   // for fine tune
   optional bool start_fine_tune_ = 60 [default = false];
+
 }
 
 message LayerConnection {
