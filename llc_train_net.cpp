@@ -5,13 +5,6 @@
  *      Author: jieshen
  */
 
-// Copyright 2013 Yangqing Jia
-//
-// This is a simple script that allows one to quickly train a network whose
-// parameters are specified by text format protocol buffers.
-// Usage:
-//    train_net net_proto_file solver_proto_file [resume_point_file]
-
 #include <cuda_runtime.h>
 
 #include <cstring>

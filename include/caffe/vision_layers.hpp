@@ -709,20 +709,17 @@ namespace caffe
       // The loss layer will do nothing during forward - all computation are
       // carried out in the backward pass.
       virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-                               vector<Blob<Dtype>*>* top)
-      {
-        return;
-      }
+                               vector<Blob<Dtype>*>* top);
       virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-                               vector<Blob<Dtype>*>* top)
-      {
-        return;
-      }
+                               vector<Blob<Dtype>*>* top);
       virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
                                  const bool propagate_down,
                                  vector<Blob<Dtype>*>* bottom);
-      // virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
-      //     const bool propagate_down, vector<Blob<Dtype>*>* bottom);
+      /*
+       virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+       const bool propagate_down,
+       vector<Blob<Dtype>*>* bottom);
+       */
       Blob<Dtype> difference_;
   };
 
@@ -758,7 +755,10 @@ namespace caffe
           : Layer<Dtype>(param),
             num_spm_level_(0),
             num_patch_(0),
-            hor_pool_(false)
+            hor_pool_(false),
+            num_cell_x_y_(0),
+            finest_num_blk_(0),
+            finest_num_cell_(0)
       {
       }
       virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
@@ -767,14 +767,17 @@ namespace caffe
      protected:
       virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
                                vector<Blob<Dtype>*>* top);
-      virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-                               vector<Blob<Dtype>*>* top);
+
       virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
                                  const bool propagate_down,
                                  vector<Blob<Dtype>*>* bottom);
-      virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
-                                 const bool propagate_down,
-                                 vector<Blob<Dtype>*>* bottom);
+      /*
+       virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+       vector<Blob<Dtype>*>* top);
+       virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+       const bool propagate_down,
+       vector<Blob<Dtype>*>* bottom);
+       */
 
      private:
       void build_spm();
@@ -783,9 +786,9 @@ namespace caffe
       int num_patch_;
       bool hor_pool_;
 
-      const int num_cell_x_y_;
-      const int finest_num_blk_;
-      const int finest_num_cell_;
+      int num_cell_x_y_;
+      int finest_num_blk_;
+      int finest_num_cell_;
 
       vector<int> level_start_idx_;
       vector<int> level_num_blk_;
@@ -793,63 +796,6 @@ namespace caffe
       map<pair<int, int>, vector<int> > map_cell_blk_start_idx_;
   };
 
-/*
- template<typename Dtype>
- class SVMLayer : public Layer<Dtype>
- {
- public:
- explicit SVMLayer(const LayerParameter& param)
- : Layer<Dtype>(param)
- {
- }
- virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
- vector<Blob<Dtype>*>* top);
-
- protected:
- virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
- vector<Blob<Dtype>*>* top);
- virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
- vector<Blob<Dtype>*>* top);
- virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
- const bool propagate_down,
- vector<Blob<Dtype>*>* bottom);
- virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
- const bool propagate_down,
- vector<Blob<Dtype>*>* bottom);
- };
-
- template<typename Dtype>
- class HingeLoss : public Layer<Dtype>
- {
- public:
- explicit HingeLoss(const LayerParameter& param)
- : Layer<Dtype>(param)
- {
- }
- virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
- vector<Blob<Dtype>*>* top);
-
- protected:
- // The loss layer will do nothing during forward - all computation are
- // carried out in the backward pass.
- virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
- vector<Blob<Dtype>*>* top)
- {
- return;
- }
- virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
- vector<Blob<Dtype>*>* top)
- {
- return;
- }
- virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
- const bool propagate_down,
- vector<Blob<Dtype>*>* bottom);
- // virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
- //     const bool propagate_down, vector<Blob<Dtype>*>* bottom);
-
- };
- */
 }  // namespace caffe
 
 #endif  // CAFFE_VISION_LAYERS_HPP_

@@ -17,7 +17,7 @@ using std::max;
 
 namespace caffe
 {
-  const float kLOG_THRESHOLD = 1e-20;
+  const double kLOG_THRESHOLD = 1e-20;
 
   template<typename Dtype>
   void LLCAccuracyLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
@@ -54,7 +54,7 @@ namespace caffe
     // LOG(INFO) << "Accuracy: " << accuracy;
     (*top)[0]->mutable_cpu_data()[0] = euclid_loss;
     (*top)[0]->mutable_cpu_data()[1] = -1.0
-        * log(max(euclid_loss, kLOG_THRESHOLD));
+        * log(max((double)euclid_loss, kLOG_THRESHOLD));
 
     free(difference);
   }

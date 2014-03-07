@@ -1,5 +1,5 @@
 /*
- * spm_layer.cu
+ * spm_layer.cpp
  *
  *  Created on: Mar 3, 2014
  *      Author: jieshen
@@ -31,7 +31,7 @@ namespace caffe
 
     build_spm();
 
-    const int llc_dim = (*bottom)[0]->count() / (*bottom)[0]->num();
+    const int llc_dim = (bottom)[0]->count() / (bottom)[0]->num();
     int channels(0);
 
     for(int i = 0; i < num_spm_level_; ++i)
@@ -76,9 +76,9 @@ namespace caffe
     for (int ycell = 0; ycell < num_cell_x_y_; ++ycell)
       for (int xcell = 0; xcell < num_cell_x_y_; ++xcell)
       {
-        pair<int, int> cell = std::make_pair(ycell, xcell);
-        CHECK_EQ(map_cell_blk_start_idx_.find(cell),
-            map_cell_blk_start_idx_.end())<< "ERROR in the data of position";
+        const pair<int, int> cell = std::make_pair(ycell, xcell);
+        CHECK(map_cell_blk_start_idx_.find(cell) ==
+            map_cell_blk_start_idx_.end()) << "ERROR in the data of position";
 
         vector<int> v_blk_idx(num_spm_level_, -1);
 
@@ -105,12 +105,12 @@ namespace caffe
                                     vector<Blob<Dtype>*>* top)
   {
     Dtype* const top_data = ((*top)[0]->mutable_cpu_data());
-    const Dtype* const bottom_data = ((*bottom)[0]->cpu_data());
-    const Dtype* const patch_pos = ((*bottom)[1]->cpu_data());
+    const Dtype* const bottom_data = ((bottom)[0]->cpu_data());
+    const Dtype* const patch_pos = ((bottom)[1]->cpu_data());
 
     const int num_img = (*top)[0]->num();
-    const int llc_dim = (*bottom)[0]->count() / (*bottom)[0]->num();
-    const int pos_dim = (*bottom)[1]->count() / (*bottom)[1]->num();
+    const int llc_dim = (bottom)[0]->count() / (bottom)[0]->num();
+    const int pos_dim = (bottom)[1]->count() / (bottom)[1]->num();
     const int top_dim = (*top)[0]->count() / num_img;
 
     CHECK_EQ(pos_dim, 2)<< "pos_dim = 2";
@@ -235,17 +235,17 @@ namespace caffe
 
     memset(bottom_diff, 0, (*bottom)[0]->count() * sizeof(Dtype));
 
-    const int num_img = (*top)[0]->num();
+    const int num_img = (top)[0]->num();
     const int llc_dim = (*bottom)[0]->count() / (*bottom)[0]->num();
     const int pos_dim = (*bottom)[1]->count() / (*bottom)[1]->num();
-    const int top_dim = (*top)[0]->count() / num_img;
+    const int top_dim = (top)[0]->count() / num_img;
 
     CHECK_EQ(pos_dim, 2)<< "pos_dim = 2";
 
     for (int imgid = 0; imgid < num_img; ++imgid)
     {
-      Dtype* const cur_top_data = top_data + imgid * top_dim;
-      Dtype* const cur_top_diff = top_diff + imgid * top_dim;
+      const Dtype* const cur_top_data = top_data + imgid * top_dim;
+      const Dtype* const cur_top_diff = top_diff + imgid * top_dim;
       const Dtype* const cur_bot_data = (bottom_data)
           + imgid * num_patch_ * llc_dim;
       const Dtype* const cur_pos = patch_pos + imgid * num_patch_ * pos_dim;

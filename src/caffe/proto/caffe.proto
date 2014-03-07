@@ -109,6 +109,9 @@ message LayerParameter {
   optional uint32 spm_level = 54 [default = 2];
   optional uint32 num_patch = 55 [default = 16];
   optional bool hor_pool = 56 [default = false];
+
+  // for fine tune
+  optional bool start_fine_tune_ = 60 [default = false];
 }
 
 message LayerConnection {
@@ -133,6 +136,9 @@ message NetParameter {
 
   optional string blob_name_for_deep_feat = 6;
   optional string blob_name_for_deep_code = 7;
+
+  // for fine tune
+  optional string last_layer_name_for_unsup = 20;
 }
 
 message SolverParameter {
