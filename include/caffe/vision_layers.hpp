@@ -7,9 +7,14 @@
 #include <pthread.h>
 
 #include <vector>
+#include <map>
 
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
+
+using std::vector;
+using std::map;
+using std::pair;
 
 namespace caffe
 {
@@ -771,9 +776,21 @@ namespace caffe
                                  const bool propagate_down,
                                  vector<Blob<Dtype>*>* bottom);
 
+     private:
+      void build_spm();
+
       int num_spm_level_;
       int num_patch_;
       bool hor_pool_;
+
+      const int num_cell_x_y_;
+      const int finest_num_blk_;
+      const int finest_num_cell_;
+
+      vector<int> level_start_idx_;
+      vector<int> level_num_blk_;
+      // vector<vector<int> > cell_to_patchidx_;
+      map<pair<int, int>, vector<int> > map_cell_blk_start_idx_;
   };
 
 /*
