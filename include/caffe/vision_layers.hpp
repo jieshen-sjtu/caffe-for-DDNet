@@ -632,6 +632,66 @@ namespace caffe
   };
 
   template<typename Dtype>
+  void* LLCDataUnsupLayerPrefetch(void* layer_pointer);
+
+  template<typename Dtype>
+  class LLCDataUnsupLayer : public Layer<Dtype>
+  {
+      // The function used to perform prefetching.
+      friend void* LLCDataUnsupLayerPrefetch<Dtype>(void* layer_pointer);
+
+     public:
+      explicit LLCDataUnsupLayer(const LayerParameter& param)
+          : Layer<Dtype>(param),
+            datum_channels_(0),
+            datum_height_(0),
+            datum_width_(0),
+            datum_size_(0),
+            thread_(0),
+            llc_dim_(0),
+            patch_height_(0),
+            patch_width_(0),
+            patch_size_(0),
+            num_patch_(0)
+      {
+      }
+      virtual ~LLCDataUnsupLayer();
+      virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+                         vector<Blob<Dtype>*>* top);
+
+     protected:
+      virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+      virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+      virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+      virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+
+      shared_ptr<leveldb::DB> db_;
+      shared_ptr<leveldb::Iterator> iter_;
+      int datum_channels_;
+      int datum_height_;
+      int datum_width_;
+      int datum_size_;
+
+      int llc_dim_;
+      int patch_height_;
+      int patch_width_;
+      int patch_size_;
+      int num_patch_;
+
+      pthread_t thread_;
+      shared_ptr<Blob<Dtype> > prefetch_data_;
+      shared_ptr<Blob<Dtype> > prefetch_llc_codes_;
+
+      Blob<Dtype> data_mean_;
+  };
+
+  template<typename Dtype>
   void* LLCDataLayerPrefetch(void* layer_pointer);
 
   template<typename Dtype>
@@ -686,12 +746,75 @@ namespace caffe
 
       pthread_t thread_;
       shared_ptr<Blob<Dtype> > prefetch_data_;
-      shared_ptr<Blob<Dtype> > prefetch_llc_codes_;
-      shared_ptr<Blob<Dtype> > prefetch_llc_patch_pos_;
       shared_ptr<Blob<Dtype> > prefetch_label_;
+      shared_ptr<Blob<Dtype> > prefetch_llc_patch_pos_;
 
       Blob<Dtype> data_mean_;
   };
+
+  /*
+   template<typename Dtype>
+   void* LLCDataLayerPrefetch(void* layer_pointer);
+
+   template<typename Dtype>
+   class LLCDataLayer : public Layer<Dtype>
+   {
+   // The function used to perform prefetching.
+   friend void* LLCDataLayerPrefetch<Dtype>(void* layer_pointer);
+
+   public:
+   explicit LLCDataLayer(const LayerParameter& param)
+   : Layer<Dtype>(param),
+   datum_channels_(0),
+   datum_height_(0),
+   datum_width_(0),
+   datum_size_(0),
+   thread_(0),
+   llc_dim_(0),
+   patch_height_(0),
+   patch_width_(0),
+   patch_size_(0),
+   num_patch_(0)
+   {
+   }
+   virtual ~LLCDataLayer();
+   virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+   vector<Blob<Dtype>*>* top);
+
+   protected:
+   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+   vector<Blob<Dtype>*>* top);
+   virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+   vector<Blob<Dtype>*>* top);
+   virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+   const bool propagate_down,
+   vector<Blob<Dtype>*>* bottom);
+   virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+   const bool propagate_down,
+   vector<Blob<Dtype>*>* bottom);
+
+   shared_ptr<leveldb::DB> db_;
+   shared_ptr<leveldb::Iterator> iter_;
+   int datum_channels_;
+   int datum_height_;
+   int datum_width_;
+   int datum_size_;
+
+   int llc_dim_;
+   int patch_height_;
+   int patch_width_;
+   int patch_size_;
+   int num_patch_;
+
+   pthread_t thread_;
+   shared_ptr<Blob<Dtype> > prefetch_data_;
+   shared_ptr<Blob<Dtype> > prefetch_llc_codes_;
+   shared_ptr<Blob<Dtype> > prefetch_llc_patch_pos_;
+   shared_ptr<Blob<Dtype> > prefetch_label_;
+
+   Blob<Dtype> data_mean_;
+   };
+   */
 
   template<typename Dtype>
   class LLCEuclideanLossLayer : public Layer<Dtype>

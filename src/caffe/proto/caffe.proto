@@ -110,9 +110,6 @@ message LayerParameter {
   optional uint32 num_patch = 55 [default = 16];
   optional bool hor_pool = 56 [default = false];
 
-  // for fine tune
-  optional bool start_fine_tune_ = 60 [default = false];
-
 }
 
 message LayerConnection {
@@ -137,10 +134,6 @@ message NetParameter {
 
   optional string blob_name_for_deep_feat = 6;
   optional string blob_name_for_deep_code = 7;
-
-  // for fine tune
-  optional bool need_fine_tune = 9 [default = false];
-  optional string last_layer_name_for_unsup = 10;
 }
 
 message SolverParameter {
@@ -170,6 +163,9 @@ message SolverParameter {
   optional int32 solver_mode = 17 [default = 1];
   // the device_id will that be used in GPU mode. Use device_id=0 in default.
   optional int32 device_id = 18 [default = 0];
+
+  optional string train_net_unsup = 19;
+  optional bool need_fine_tune = 20 [default = true];
 }
 
 // A message that stores the solver snapshots

@@ -82,6 +82,9 @@ namespace caffe
     } else if (type == "llc_data")
     {
       return new LLCDataLayer<Dtype>(param);
+    } else if (type == "llc_data_unsup")
+    {
+      return new LLCDataUnsupLayer<Dtype>(param);
     } else if (type == "llc_euclidean_loss")
     {
       return new LLCEuclideanLossLayer<Dtype>(param);

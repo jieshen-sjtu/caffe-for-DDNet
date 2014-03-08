@@ -25,17 +25,16 @@ namespace caffe
 {
 
   template<typename Dtype>
-  void* LLCDataLayerPrefetch(void* layer_pointer)
+  void* LLCDataUnsupLayerPrefetch(void* layer_pointer)
   {
     CHECK(layer_pointer);
-    LLCDataLayer<Dtype>* layer =
-        reinterpret_cast<LLCDataLayer<Dtype>*>(layer_pointer);
+    LLCDataUnsupLayer<Dtype>* layer =
+        reinterpret_cast<LLCDataUnsupLayer<Dtype>*>(layer_pointer);
     CHECK(layer);
     Datum datum;
     CHECK(layer->prefetch_data_);
     Dtype* top_data = layer->prefetch_data_->mutable_cpu_data();
-    Dtype* top_label = layer->prefetch_label_->mutable_cpu_data();
-    Dtype* top_patch_pos = layer->prefetch_llc_patch_pos_->mutable_cpu_data();
+    Dtype* top_llc_codes = layer->prefetch_llc_codes_->mutable_cpu_data();
 
     const Dtype scale = layer->layer_param_.scale();
     const int batchsize = layer->layer_param_.batchsize();
@@ -154,11 +153,8 @@ namespace caffe
        }
        }*/
 
-      // fetch label
-      top_label[imgid] = label;
-
       const int data_start = imgid * num_patch * patch_size;
-      const int patch_pos_start = imgid * num_patch * 2;
+      const int llc_code_start = imgid * num_patch * llc_dim;
 
       for (int pid = 0; pid < num_patch; ++pid)
       {
@@ -169,10 +165,20 @@ namespace caffe
               + j]) - mean[pid * patch_size + j]) * scale;
         }
 
-        // fetch patch position
-        Dtype* cur_patch_pos = top_patch_pos + patch_pos_start + pid * 2;
-        *cur_patch_pos = datum.llc_xid(pid);
-        *(cur_patch_pos + 1) = datum.llc_yid(pid);
+        Dtype* cur_llc_code = (top_llc_codes) + llc_code_start + pid * llc_dim;
+        for (int j = 0; j < llc_dim; ++j)
+        {
+          *(cur_llc_code + j) = static_cast<Dtype>(datum.llc_codes(
+              pid * llc_dim + j));
+        }
+
+        // normalize llc code to one
+        const float norm1 = cblas_sasum(llc_dim,
+                                        reinterpret_cast<float*>(cur_llc_code),
+                                        1);
+        cblas_sscal(llc_dim, 1.0 / norm1,
+                    reinterpret_cast<float*>(cur_llc_code), 1);
+
       }
 
       // go to the next iter
@@ -188,19 +194,19 @@ namespace caffe
   }
 
   template<typename Dtype>
-  LLCDataLayer<Dtype>::~LLCDataLayer<Dtype>()
+  LLCDataUnsupLayer<Dtype>::~LLCDataUnsupLayer<Dtype>()
   {
     // Finally, join the thread
     CHECK(!pthread_join(thread_, NULL)) << "Pthread joining failed.";
   }
 
   template<typename Dtype>
-  void LLCDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
-                                  vector<Blob<Dtype>*>* top)
+  void LLCDataUnsupLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
+                                       vector<Blob<Dtype>*>* top)
   {
     CHECK_EQ(bottom.size(), 0)<< "LLCData Layer takes no input blobs.";
-    CHECK_EQ(top->size(), 3) << "LLCData Layer takes four blobs as output: "
-    << "data, label, patch pos";
+    CHECK_EQ(top->size(), 2) << "LLCData Layer takes four blobs as output: "
+    << "data, llc code";
 
     // Initialize the leveldb
     leveldb::DB* db_temp;
@@ -276,19 +282,12 @@ namespace caffe
     << (*top)[0]->channels() << "," << (*top)[0]->height() << ","
     << (*top)[0]->width();
 
-    // label
-    (*top)[1]->Reshape(batchsz, 1, 1, 1);
-    prefetch_label_.reset(new Blob<Dtype>(batchsz, 1, 1, 1));
-    LOG(INFO) << "output label size: " << (*top)[1]->num() << ","
+    // LLC code
+    (*top)[1]->Reshape(batchsz * num_patch_, llc_dim_, 1, 1);
+    prefetch_llc_codes_.reset(new Blob<Dtype>(batchsz * num_patch_, llc_dim_, 1, 1));
+    LOG(INFO) << "output LLC code size: " << (*top)[1]->num() << ","
     << (*top)[1]->channels() << "," << (*top)[1]->height() << ","
     << (*top)[1]->width();
-
-    // patch position
-    (*top)[2]->Reshape(batchsz * num_patch_, 2, 1, 1);
-    prefetch_llc_patch_pos_.reset(new Blob<Dtype>(batchsz * num_patch_, 2, 1, 1));
-    LOG(INFO) << "output patch position size: " << (*top)[2]->num() << ","
-    << (*top)[2]->channels() << "," << (*top)[2]->height() << ","
-    << (*top)[2]->width();
 
     // check if we want to have mean
     if (this->layer_param_.has_meanfile())
@@ -312,37 +311,34 @@ namespace caffe
     // simultaneous cudaMalloc calls when the main thread is running. In some
     // GPUs this seems to cause failures if we do not so.
     prefetch_data_->mutable_cpu_data();
-    prefetch_label_->mutable_cpu_data();
-    prefetch_llc_patch_pos_->mutable_cpu_data();
+    prefetch_llc_codes_->mutable_cpu_data();
     data_mean_.cpu_data();
     DLOG(INFO) << "Initializing prefetch";
-    CHECK(!pthread_create(&thread_, NULL, LLCDataLayerPrefetch<Dtype>,
+    CHECK(!pthread_create(&thread_, NULL, LLCDataUnsupLayerPrefetch<Dtype>,
             reinterpret_cast<void*>(this))) << "Pthread execution failed.";
     DLOG(INFO) << "Prefetch initialized.";
   }
 
   template<typename Dtype>
-  void LLCDataLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-                                        vector<Blob<Dtype>*>* top)
+  void LLCDataUnsupLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                                             vector<Blob<Dtype>*>* top)
   {
     // First, join the thread
     CHECK(!pthread_join(thread_, NULL)) << "Pthread joining failed.";
     // Copy the data
     memcpy((*top)[0]->mutable_cpu_data(), prefetch_data_->cpu_data(),
            sizeof(Dtype) * prefetch_data_->count());
-    memcpy((*top)[1]->mutable_cpu_data(), prefetch_label_->cpu_data(),
-           sizeof(Dtype) * prefetch_label_->count());
-    memcpy((*top)[2]->mutable_cpu_data(), prefetch_llc_patch_pos_->cpu_data(),
-           sizeof(Dtype) * prefetch_llc_patch_pos_->count());
+    memcpy((*top)[1]->mutable_cpu_data(), prefetch_llc_codes_->cpu_data(),
+           sizeof(Dtype) * prefetch_llc_codes_->count());
 
     // Start a new prefetch thread
-    CHECK(!pthread_create(&thread_, NULL, LLCDataLayerPrefetch<Dtype>,
+    CHECK(!pthread_create(&thread_, NULL, LLCDataUnsupLayerPrefetch<Dtype>,
             reinterpret_cast<void*>(this))) << "Pthread execution failed.";
   }
 
   template<typename Dtype>
-  void LLCDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-                                        vector<Blob<Dtype>*>* top)
+  void LLCDataUnsupLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                                             vector<Blob<Dtype>*>* top)
   {
     // First, join the thread
     CHECK(!pthread_join(thread_, NULL)) << "Pthread joining failed.";
@@ -352,37 +348,33 @@ namespace caffe
                    sizeof(Dtype) * prefetch_data_->count(),
                    cudaMemcpyHostToDevice));
     CUDA_CHECK(
-        cudaMemcpy((*top)[1]->mutable_gpu_data(), prefetch_label_->cpu_data(),
-                   sizeof(Dtype) * prefetch_label_->count(),
-                   cudaMemcpyHostToDevice));
-    CUDA_CHECK(
-        cudaMemcpy((*top)[2]->mutable_gpu_data(),
-                   prefetch_llc_patch_pos_->cpu_data(),
-                   sizeof(Dtype) * prefetch_llc_patch_pos_->count(),
+        cudaMemcpy((*top)[1]->mutable_gpu_data(),
+                   prefetch_llc_codes_->cpu_data(),
+                   sizeof(Dtype) * prefetch_llc_codes_->count(),
                    cudaMemcpyHostToDevice));
 
     // Start a new prefetch thread
-    CHECK(!pthread_create(&thread_, NULL, LLCDataLayerPrefetch<Dtype>,
+    CHECK(!pthread_create(&thread_, NULL, LLCDataUnsupLayerPrefetch<Dtype>,
             reinterpret_cast<void*>(this))) << "Pthread execution failed.";
   }
 
 // The backward operations are dummy - they do not carry any computation.
   template<typename Dtype>
-  Dtype LLCDataLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
-                                          const bool propagate_down,
-                                          vector<Blob<Dtype>*>* bottom)
+  Dtype LLCDataUnsupLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                               const bool propagate_down,
+                                               vector<Blob<Dtype>*>* bottom)
   {
     return Dtype(0.);
   }
 
   template<typename Dtype>
-  Dtype LLCDataLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
-                                          const bool propagate_down,
-                                          vector<Blob<Dtype>*>* bottom)
+  Dtype LLCDataUnsupLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
+                                               const bool propagate_down,
+                                               vector<Blob<Dtype>*>* bottom)
   {
     return Dtype(0.);
   }
 
-  INSTANTIATE_CLASS(LLCDataLayer);
+  INSTANTIATE_CLASS(LLCDataUnsupLayer);
 
 }  // namespace caffe

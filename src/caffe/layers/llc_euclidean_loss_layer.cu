@@ -31,42 +31,22 @@ namespace caffe
     difference_.Reshape(bottom[0]->num(), bottom[0]->channels(),
         bottom[0]->height(), bottom[0]->width());
 
-    // check if we want fine-tune
-    /*
-     if(this->start_fine_tune_)
-     CHECK_EQ(top->size(), 1) << "LLC Loss Layer takes one output for fine tune";
-     else
-     CHECK_EQ(top->size(), 0);
-     */
-
-    CHECK_EQ(top->size(), 1) << "LLC Loss Layer takes one output for fine tune";
-    (*top)[0]->Reshape(bottom[0]->num(), bottom[0]->channels(),
-        bottom[0]->height(), bottom[0]->width());
+    CHECK_EQ(top->size(), 0) << "LLC Loss Layer takes no output";
   }
 
   template<typename Dtype>
   void LLCEuclideanLossLayer<Dtype>::Forward_cpu(
       const vector<Blob<Dtype>*>& bottom, vector<Blob<Dtype>*>* top)
   {
-    if (!this->start_fine_tune())
-      return;
-
-    // when fine, we just copy the data
-    const Dtype* const bottom_data = bottom[0]->cpu_data();
-    Dtype* const top_data = (*top)[0]->mutable_cpu_data();
-    caffe_copy(bottom[0]->count(), bottom_data, top_data);
+    return;
   }
 
   template<typename Dtype>
   void LLCEuclideanLossLayer<Dtype>::Forward_gpu(
       const vector<Blob<Dtype>*>& bottom, vector<Blob<Dtype>*>* top)
   {
-    if (!this->start_fine_tune())
-      return;
+    return;
 
-    const Dtype* const bottom_data = bottom[0]->gpu_data();
-    Dtype* const top_data = (*top)[0]->mutable_gpu_data();
-    caffe_gpu_copy(bottom[0]->count(), bottom_data, top_data);
   }
 
   template<typename Dtype>
@@ -74,14 +54,6 @@ namespace caffe
       const vector<Blob<Dtype>*>& top, const bool propagate_down,
       vector<Blob<Dtype>*>* bottom)
   {
-    if (this->start_fine_tune())
-    {
-      const Dtype* const top_diff = top[0]->cpu_diff();
-      Dtype* const bottom_diff = (*bottom)[0]->mutable_cpu_diff();
-      caffe_copy(top[0]->count(), top_diff, bottom_diff);
-
-      return Dtype(0.);
-    }
 
     int count = (*bottom)[0]->count();
     int num = (*bottom)[0]->num();

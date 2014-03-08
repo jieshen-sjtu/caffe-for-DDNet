@@ -154,23 +154,6 @@ namespace caffe
       {
         return blob_id_for_deep_code_;
       }
-      inline bool need_fine_tune() const
-      {
-        return need_fine_tune_;
-      }
-      inline const string& last_layer_name_for_unsup() const
-      {
-        return last_layer_name_for_unsup_;
-      }
-      inline const int last_layer_id_for_unsup() const
-      {
-        return last_layer_id_for_unsup_;
-      }
-      inline bool start_fine_tune() const
-      {
-        return start_fine_tune_;
-      }
-      void set_start_fine_tune();
 
      protected:
       // Function to get misc parameters, e.g. the learning rate multiplier and
@@ -210,15 +193,6 @@ namespace caffe
       int blob_id_for_deep_feat_;
       string blob_name_for_deep_code_;
       int blob_id_for_deep_code_;
-
-      bool need_fine_tune_;
-      string last_layer_name_for_unsup_;
-      int last_layer_id_for_unsup_;
-
-      bool start_fine_tune_;
-
-      int endlayer_;
-      bool has_set_fine_tune_;
 
     DISABLE_COPY_AND_ASSIGN(Net);
   };

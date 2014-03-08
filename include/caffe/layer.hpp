@@ -33,8 +33,6 @@ namespace caffe
             blobs_[i]->FromProto(layer_param_.blobs(i));
           }
         }
-
-        start_fine_tune_ = false;
       }
       virtual ~Layer()
       {
@@ -66,23 +64,11 @@ namespace caffe
       // Writes the layer parameter to a protocol buffer
       virtual void ToProto(LayerParameter* param, bool write_diff = false);
 
-      virtual void set_start_fine_tune(bool start)
-      {
-        start_fine_tune_ = start;
-      }
-
-      virtual bool start_fine_tune() const
-      {
-        return start_fine_tune_;
-      }
-
      protected:
       // The protobuf that stores the layer parameters
       LayerParameter layer_param_;
       // The vector that stores the parameters as a set of blobs.
       vector<shared_ptr<Blob<Dtype> > > blobs_;
-
-      bool start_fine_tune_;
 
       // Forward functions
       virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
