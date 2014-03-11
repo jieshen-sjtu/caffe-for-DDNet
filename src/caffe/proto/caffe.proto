@@ -110,6 +110,9 @@ message LayerParameter {
   optional uint32 num_patch = 55 [default = 16];
   optional bool hor_pool = 56 [default = false];
 
+  // for svm out layer
+  optional string svm_out_file = 60;
+
 }
 
 message LayerConnection {

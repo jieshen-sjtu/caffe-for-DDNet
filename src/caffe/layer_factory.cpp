@@ -22,79 +22,112 @@ namespace caffe
     if (type == "accuracy")
     {
       return new AccuracyLayer<Dtype>(param);
-    } else if (type == "bnll")
+    }
+    else if (type == "bnll")
     {
       return new BNLLLayer<Dtype>(param);
-    } else if (type == "conv")
+    }
+    else if (type == "conv")
     {
       return new ConvolutionLayer<Dtype>(param);
-    } else if (type == "data")
+    }
+    else if (type == "data")
     {
       return new DataLayer<Dtype>(param);
-    } else if (type == "dropout")
+    }
+    else if (type == "dropout")
     {
       return new DropoutLayer<Dtype>(param);
-    } else if (type == "euclidean_loss")
+    }
+    else if (type == "euclidean_loss")
     {
       return new EuclideanLossLayer<Dtype>(param);
-    } else if (type == "flatten")
+    }
+    else if (type == "flatten")
     {
       return new FlattenLayer<Dtype>(param);
-    } else if (type == "im2col")
+    }
+    else if (type == "im2col")
     {
       return new Im2colLayer<Dtype>(param);
-    } else if (type == "infogain_loss")
+    }
+    else if (type == "infogain_loss")
     {
       return new InfogainLossLayer<Dtype>(param);
-    } else if (type == "innerproduct")
+    }
+    else if (type == "innerproduct")
     {
       return new InnerProductLayer<Dtype>(param);
-    } else if (type == "lrn")
+    }
+    else if (type == "lrn")
     {
       return new LRNLayer<Dtype>(param);
-    } else if (type == "padding")
+    }
+    else if (type == "padding")
     {
       return new PaddingLayer<Dtype>(param);
-    } else if (type == "pool")
+    }
+    else if (type == "pool")
     {
       return new PoolingLayer<Dtype>(param);
-    } else if (type == "relu")
+    }
+    else if (type == "relu")
     {
       return new ReLULayer<Dtype>(param);
-    } else if (type == "tanh")
+    }
+    else if (type == "tanh")
     {
       return new TanHLayer<Dtype>(param);
-    } else if (type == "sigmoid")
+    }
+    else if (type == "sigmoid")
     {
       return new SigmoidLayer<Dtype>(param);
-    } else if (type == "softmax")
+    }
+    else if (type == "softmax")
     {
       return new SoftmaxLayer<Dtype>(param);
-    } else if (type == "softmax_loss")
+    }
+    else if (type == "softmax_loss")
     {
       return new SoftmaxWithLossLayer<Dtype>(param);
-    } else if (type == "split")
+    }
+    else if (type == "split")
     {
       return new SplitLayer<Dtype>(param);
-    } else if (type == "multinomial_logistic_loss")
+    }
+    else if (type == "multinomial_logistic_loss")
     {
       return new MultinomialLogisticLossLayer<Dtype>(param);
-    } else if (type == "llc_data")
+    }
+    else if (type == "llc_data")
     {
       return new LLCDataLayer<Dtype>(param);
-    } else if (type == "llc_data_unsup")
+    }
+    else if (type == "llc_data_unsup")
     {
       return new LLCDataUnsupLayer<Dtype>(param);
-    } else if (type == "llc_euclidean_loss")
+    }
+    else if (type == "llc_euclidean_loss")
     {
       return new LLCEuclideanLossLayer<Dtype>(param);
-    } else if (type == "llc_accuracy")
+    }
+    else if (type == "llc_accuracy")
     {
       return new LLCAccuracyLayer<Dtype>(param);
-    } else if (type == "spm")
+    }
+    else if (type == "spm")
     {
       return new SPMLayer<Dtype>(param);
-    } else
+    }
+    else if (type == "svm_out")
+    {
+      return new SVMOutLayer<Dtype>(param);
+    }
+    else if (type == "llc_data_svm")
+    {
+      return new LLCDataSVMLayer<Dtype>(param);
+    }
+    else
     {
       LOG(FATAL)<< "Unknown layer name: " << type;
     }

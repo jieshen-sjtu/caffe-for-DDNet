@@ -1,5 +1,5 @@
 /*
- * llc_accuracy_layer.cu
+ * llc_accuracy_layer.cpp
  *
  *  Created on: Mar 1, 2014
  *      Author: jieshen
@@ -33,6 +33,9 @@ namespace caffe
     CHECK_EQ(bottom[1]->height(), 1);
     CHECK_EQ(bottom[1]->width(), 1);
     (*top)[0]->Reshape(1, 2, 1, 1);// only compute the loss and log(loss)
+
+    difference_.Reshape(bottom[0]->num(), bottom[0]->channels(),
+        bottom[0]->height(), bottom[0]->width());
   }
 
   template<typename Dtype>
@@ -44,19 +47,17 @@ namespace caffe
     int num = bottom[0]->num();
     int dim = bottom[0]->count() / bottom[0]->num();
 
-    Dtype* difference = (Dtype*) malloc(sizeof(Dtype) * bottom[0]->count());
-
-    caffe_sub(bottom[0]->count(), bottom_data, bottom_label, difference);
+    caffe_sub(bottom[0]->count(), bottom_data, bottom_label,
+              difference_.mutable_cpu_data());
 
     Dtype euclid_loss = 0.5 / num
-        * caffe_cpu_dot(bottom[0]->count(), difference, difference);
+        * caffe_cpu_dot(bottom[0]->count(), difference_.cpu_data(),
+                        difference_.cpu_data());
 
     // LOG(INFO) << "Accuracy: " << accuracy;
     (*top)[0]->mutable_cpu_data()[0] = euclid_loss;
     (*top)[0]->mutable_cpu_data()[1] = -1.0
-        * log(max((double)euclid_loss, kLOG_THRESHOLD));
-
-    free(difference);
+        * log(max((double) euclid_loss, kLOG_THRESHOLD));
   }
 
   INSTANTIATE_CLASS(LLCAccuracyLayer);

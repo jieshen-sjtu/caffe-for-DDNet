@@ -6,13 +6,16 @@
 #include <leveldb/db.h>
 #include <pthread.h>
 
+#include <cstdio>
 #include <vector>
+#include <string>
 #include <map>
 
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 
 using std::vector;
+using std::string;
 using std::map;
 using std::pair;
 
@@ -652,7 +655,9 @@ namespace caffe
             patch_height_(0),
             patch_width_(0),
             patch_size_(0),
-            num_patch_(0)
+            num_patch_(0),
+            prefetch_data_(),
+            prefetch_llc_codes_()
       {
       }
       virtual ~LLCDataUnsupLayer();
@@ -712,7 +717,10 @@ namespace caffe
             patch_height_(0),
             patch_width_(0),
             patch_size_(0),
-            num_patch_(0)
+            num_patch_(0),
+            prefetch_data_(),
+            prefetch_label_(),
+            prefetch_llc_patch_pos_()
       {
       }
       virtual ~LLCDataLayer();
@@ -746,6 +754,70 @@ namespace caffe
 
       pthread_t thread_;
       shared_ptr<Blob<Dtype> > prefetch_data_;
+      shared_ptr<Blob<Dtype> > prefetch_label_;
+      shared_ptr<Blob<Dtype> > prefetch_llc_patch_pos_;
+
+      Blob<Dtype> data_mean_;
+  };
+
+  template<typename Dtype>
+  void* LLCDataSVMLayerPrefetch(void* layer_pointer);
+
+  template<typename Dtype>
+  class LLCDataSVMLayer : public Layer<Dtype>
+  {
+      // The function used to perform prefetching.
+      friend void* LLCDataSVMLayerPrefetch<Dtype>(void* layer_pointer);
+
+     public:
+      explicit LLCDataSVMLayer(const LayerParameter& param)
+          : Layer<Dtype>(param),
+            datum_channels_(0),
+            datum_height_(0),
+            datum_width_(0),
+            datum_size_(0),
+            thread_(0),
+            llc_dim_(0),
+            patch_height_(0),
+            patch_width_(0),
+            patch_size_(0),
+            num_patch_(0),
+            prefetch_llc_code_(),
+            prefetch_label_(),
+            prefetch_llc_patch_pos_()
+      {
+      }
+      virtual ~LLCDataSVMLayer();
+      virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+                         vector<Blob<Dtype>*>* top);
+
+     protected:
+      virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+      virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+      virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+      virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+
+      shared_ptr<leveldb::DB> db_;
+      shared_ptr<leveldb::Iterator> iter_;
+      int datum_channels_;
+      int datum_height_;
+      int datum_width_;
+      int datum_size_;
+
+      int llc_dim_;
+      int patch_height_;
+      int patch_width_;
+      int patch_size_;
+      int num_patch_;
+
+      pthread_t thread_;
+      shared_ptr<Blob<Dtype> > prefetch_llc_code_;
       shared_ptr<Blob<Dtype> > prefetch_label_;
       shared_ptr<Blob<Dtype> > prefetch_llc_patch_pos_;
 
@@ -868,6 +940,8 @@ namespace caffe
         NOT_IMPLEMENTED;
         return Dtype(0.);
       }
+
+      Blob<Dtype> difference_;
   };
 
   template<typename Dtype>
@@ -881,7 +955,10 @@ namespace caffe
             hor_pool_(false),
             num_cell_x_y_(0),
             finest_num_blk_(0),
-            finest_num_cell_(0)
+            finest_num_cell_(0),
+            num_img_(0),
+            llc_dim_(0),
+            pos_dim_(0)
       {
       }
       virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
@@ -917,6 +994,39 @@ namespace caffe
       vector<int> level_num_blk_;
       // vector<vector<int> > cell_to_patchidx_;
       map<pair<int, int>, vector<int> > map_cell_blk_start_idx_;
+
+      int num_img_;
+      int llc_dim_;
+      int pos_dim_;
+  };
+
+  template<typename Dtype>
+  class SVMOutLayer : public Layer<Dtype>
+  {
+     public:
+      explicit SVMOutLayer(const LayerParameter& param);
+      virtual ~SVMOutLayer();
+      virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+                         vector<Blob<Dtype>*>* top);
+
+     protected:
+      virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+
+      virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+      /*
+       virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+       vector<Blob<Dtype>*>* top);
+       virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+       const bool propagate_down,
+       vector<Blob<Dtype>*>* bottom);
+       */
+
+      int dim_;
+      string out_file_;
+      FILE* output_;
   };
 
 }  // namespace caffe

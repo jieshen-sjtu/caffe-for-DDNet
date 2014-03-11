@@ -31,16 +31,21 @@ namespace caffe
 
     build_spm();
 
-    const int llc_dim = (bottom)[0]->count() / (bottom)[0]->num();
+    llc_dim_ = (bottom)[0]->count() / (bottom)[0]->num();
     int channels(0);
 
     for(int i = 0; i < num_spm_level_; ++i)
     channels += std::pow(4, i);
 
-    channels *= llc_dim;
+    channels *= llc_dim_;
+
+    num_img_ = bottom[0]->num() / num_patch_;
+    pos_dim_ = bottom[1]->count() / bottom[1]->num();
+
+    CHECK_EQ(pos_dim_, 2)<< "pos_dim = 2";
 
     // merge the image patches
-    (*top)[0]->Reshape(bottom[0]->num() / num_patch_, channels, 1, 1);
+    (*top)[0]->Reshape(num_img_, channels, 1, 1);
   }
 
   template<typename Dtype>
@@ -66,9 +71,10 @@ namespace caffe
 
       for (int lv = num_spm_level_ - 2; lv >= 0; --lv)
       {
-        level_num_blk_[lv] = level_num_blk_[lv + 1] / 2;
-        level_start_idx_[lv] = level_start_idx_[lv + 1]
-            + level_num_blk_[lv + 1] * level_num_blk_[lv + 1];
+        const int prev_lv = lv + 1;
+        level_num_blk_[lv] = level_num_blk_[prev_lv] / 2;
+        level_start_idx_[lv] = level_start_idx_[prev_lv]
+            + level_num_blk_[prev_lv] * level_num_blk_[prev_lv];
       }
     }
 
@@ -108,26 +114,25 @@ namespace caffe
     const Dtype* const bottom_data = ((bottom)[0]->cpu_data());
     const Dtype* const patch_pos = ((bottom)[1]->cpu_data());
 
-    const int num_img = (*top)[0]->num();
-    const int llc_dim = (bottom)[0]->count() / (bottom)[0]->num();
-    const int pos_dim = (bottom)[1]->count() / (bottom)[1]->num();
-    const int top_dim = (*top)[0]->count() / num_img;
+    const int top_dim = (*top)[0]->count() / num_img_;
 
-    CHECK_EQ(pos_dim, 2)<< "pos_dim = 2";
+    //LOG(INFO) << "total img: " << num_img_;
 
-    for (int imgid = 0; imgid < num_img; ++imgid)
+    for (int imgid = 0; imgid < num_img_; ++imgid)
     {
+      //LOG(INFO) << "imgid: " << imgid;
+
       Dtype* const cur_top_data = top_data + imgid * top_dim;
       const Dtype* const cur_bot_data = (bottom_data)
-          + imgid * num_patch_ * llc_dim;
-      const Dtype* const cur_pos = patch_pos + imgid * num_patch_ * pos_dim;
+          + imgid * num_patch_ * llc_dim_;
+      const Dtype* const cur_pos = patch_pos + imgid * num_patch_ * pos_dim_;
 
       vector<vector<int> > cell_pos_map(num_cell_x_y_,
                                         vector<int>(num_cell_x_y_, 0));
       for (int tmpi = 0; tmpi < num_patch_; ++tmpi)
       {
-        const int x = static_cast<int>(*(cur_pos + tmpi * pos_dim));
-        const int y = static_cast<int>(*(cur_pos + tmpi * pos_dim + 1));
+        const int x = static_cast<int>(*(cur_pos + tmpi * pos_dim_));
+        const int y = static_cast<int>(*(cur_pos + tmpi * pos_dim_ + 1));
         cell_pos_map[y][x] = tmpi;
       }
 
@@ -136,15 +141,16 @@ namespace caffe
       if (finest_num_blk_ == num_cell_x_y_)
       {
         memcpy(cur_top_data, cur_bot_data,
-               sizeof(Dtype) * num_patch_ * llc_dim);
-      } else
+               sizeof(Dtype) * num_patch_ * llc_dim_);
+      }
+      else
       {
         int code_idx(0);
 
         for (int ybin = 0; ybin < finest_num_blk_; ++ybin)
           for (int xbin = 0; xbin < finest_num_blk_; ++xbin)
           {
-            Dtype* const out_code = cur_top_data + llc_dim * code_idx;
+            Dtype* const out_code = cur_top_data + llc_dim_ * code_idx;
             ++code_idx;
 
             for (int ycell = 0; ycell < finest_num_cell_; ++ycell)
@@ -157,15 +163,15 @@ namespace caffe
 
                 //cout << "patchidx: " << patchidx << endl;
 
-                const Dtype* const in_code = cur_bot_data + llc_dim * patchidx;
+                const Dtype* const in_code = cur_bot_data + llc_dim_ * patchidx;
 
                 // for the first time, initialize
                 if (ycell == 0 && xcell == 0)
-                  memcpy(out_code, in_code, sizeof(Dtype) * llc_dim);
+                  memcpy(out_code, in_code, sizeof(Dtype) * llc_dim_);
                 else
                 {
                   // max pooling
-                  for (int dd = 0; dd < llc_dim; ++dd)
+                  for (int dd = 0; dd < llc_dim_; ++dd)
                     out_code[dd] =
                         out_code[dd] > in_code[dd] ? out_code[dd] : in_code[dd];
                 }
@@ -188,7 +194,7 @@ namespace caffe
           for (int xbin = 0; xbin < num_blk; ++xbin)
           {
             const int out_idx = level_start_idx + idx;
-            Dtype* out_code = cur_top_data + llc_dim * out_idx;
+            Dtype* out_code = cur_top_data + llc_dim_ * out_idx;
 
             //cout << "out idx: " << out_idx << " ";
 
@@ -200,13 +206,13 @@ namespace caffe
                     + y_subbin * 2 + x_subbin;
                 //cout << "in index: " << in_subbin_idx << endl;
                 const Dtype* const in_code = cur_top_data
-                    + in_subbin_idx * llc_dim;
+                    + in_subbin_idx * llc_dim_;
 
                 if (y_subbin == 0 && x_subbin == 0)
-                  memcpy(out_code, in_code, llc_dim);
+                  memcpy(out_code, in_code, llc_dim_);
                 else
                 {
-                  for (int dd = 0; dd < llc_dim; ++dd)
+                  for (int dd = 0; dd < llc_dim_; ++dd)
                     out_code[dd] =
                         out_code[dd] > in_code[dd] ? out_code[dd] : in_code[dd];
                 }
@@ -235,29 +241,24 @@ namespace caffe
 
     memset(bottom_diff, 0, (*bottom)[0]->count() * sizeof(Dtype));
 
-    const int num_img = (top)[0]->num();
-    const int llc_dim = (*bottom)[0]->count() / (*bottom)[0]->num();
-    const int pos_dim = (*bottom)[1]->count() / (*bottom)[1]->num();
-    const int top_dim = (top)[0]->count() / num_img;
+    const int top_dim = (top)[0]->count() / num_img_;
 
-    CHECK_EQ(pos_dim, 2)<< "pos_dim = 2";
-
-    for (int imgid = 0; imgid < num_img; ++imgid)
+    for (int imgid = 0; imgid < num_img_; ++imgid)
     {
       const Dtype* const cur_top_data = top_data + imgid * top_dim;
       const Dtype* const cur_top_diff = top_diff + imgid * top_dim;
       const Dtype* const cur_bot_data = (bottom_data)
-          + imgid * num_patch_ * llc_dim;
-      const Dtype* const cur_pos = patch_pos + imgid * num_patch_ * pos_dim;
+          + imgid * num_patch_ * llc_dim_;
+      const Dtype* const cur_pos = patch_pos + imgid * num_patch_ * pos_dim_;
 
-      Dtype* const cur_bot_diff = bottom_diff + imgid * num_patch_ * llc_dim;
+      Dtype* const cur_bot_diff = bottom_diff + imgid * num_patch_ * llc_dim_;
 
       vector<vector<int> > cell_pos_map(num_cell_x_y_,
                                         vector<int>(num_cell_x_y_, 0));
       for (int tmpi = 0; tmpi < num_patch_; ++tmpi)
       {
-        const int x = static_cast<int>(*(cur_pos + tmpi * pos_dim));
-        const int y = static_cast<int>(*(cur_pos + tmpi * pos_dim + 1));
+        const int x = static_cast<int>(*(cur_pos + tmpi * pos_dim_));
+        const int y = static_cast<int>(*(cur_pos + tmpi * pos_dim_ + 1));
         cell_pos_map[y][x] = tmpi;
       }
 
@@ -265,8 +266,8 @@ namespace caffe
         for (int xcell = 0; xcell < num_cell_x_y_; ++xcell)
         {
           const int patchidx = cell_pos_map[ycell][xcell];
-          Dtype* const in_diff = cur_bot_diff + llc_dim * patchidx;
-          const Dtype* const in_data = cur_bot_data + llc_dim * patchidx;
+          Dtype* const in_diff = cur_bot_diff + llc_dim_ * patchidx;
+          const Dtype* const in_data = cur_bot_data + llc_dim_ * patchidx;
 
           map<pair<int, int>, vector<int> >::const_iterator it =
               map_cell_blk_start_idx_.find(std::make_pair(ycell, xcell));
@@ -278,11 +279,11 @@ namespace caffe
           for (size_t blki = 0; blki < v_blks_idx.size(); ++blki)
           {
             const Dtype* const out_data = cur_top_data
-                + v_blks_idx[blki] * llc_dim;
+                + v_blks_idx[blki] * llc_dim_;
             const Dtype* const out_diff = cur_top_diff
-                + v_blks_idx[blki] * llc_dim;
+                + v_blks_idx[blki] * llc_dim_;
 
-            for (int dd = 0; dd < llc_dim; ++dd)
+            for (int dd = 0; dd < llc_dim_; ++dd)
             {
               in_diff[dd] += out_diff[dd]
                   * (abs(in_data[dd] - out_data[dd]) < FLT_THRD);
