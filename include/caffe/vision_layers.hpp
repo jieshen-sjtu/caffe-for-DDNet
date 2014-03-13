@@ -14,6 +14,8 @@
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 
+#include "EYE.hpp"
+
 using std::vector;
 using std::string;
 using std::map;
@@ -822,6 +824,51 @@ namespace caffe
       shared_ptr<Blob<Dtype> > prefetch_llc_patch_pos_;
 
       Blob<Dtype> data_mean_;
+  };
+
+  template<typename Dtype>
+  class PatchCodeLayer : public Layer<Dtype>
+  {
+     public:
+      explicit PatchCodeLayer(const LayerParameter& param);
+
+      ~PatchCodeLayer()
+      {
+        if(tmp_data_)
+          free(tmp_data_);
+      }
+
+      virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+                         vector<Blob<Dtype>*>* top);
+
+     protected:
+      virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+      virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+      /*
+       virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+       vector<Blob<Dtype>*>* top);
+       virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+       const bool propagate_down,
+       vector<Blob<Dtype>*>* bottom);
+       */
+
+      int img_height_;
+      int img_width_;
+      int img_channels_;
+      int img_size_;
+      uint32_t dsift_step_;
+      vector<uint32_t> dsift_sizes_;
+      uint32_t dsift_std_size_;
+      vector<int> dsift_off_;
+      vector<uint32_t> dsift_num_patches_;
+
+      EYE::LLC llc_model_;
+      EYE::DSift dsift_model_;
+
+      Dtype* tmp_data_;
   };
 
   /*

@@ -113,6 +113,14 @@ message LayerParameter {
   // for svm out layer
   optional string svm_out_file = 60;
 
+  // for PatchCodeLayer
+//  optional uint32 img_height = 70;
+//  optional uint32 img_width = 71;
+//  optional uint32 img_channels = 72;
+  optional uint32 dsift_step = 73;
+  repeated uint32 dsift_sizes = 74 [packed = true];
+  optional uint32 dsift_std_size = 75;
+  optional string codebook = 76;
 }
 
 message LayerConnection {

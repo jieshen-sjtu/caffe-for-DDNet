@@ -127,6 +127,10 @@ namespace caffe
     {
       return new LLCDataSVMLayer<Dtype>(param);
     }
+    else if (type == "ddnet_data")
+    {
+      return new DDNetDataLayer<Dtype>(param);
+    }
     else
     {
       LOG(FATAL)<< "Unknown layer name: " << type;
