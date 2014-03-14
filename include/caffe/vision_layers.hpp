@@ -3,6 +3,7 @@
 #ifndef CAFFE_VISION_LAYERS_HPP_
 #define CAFFE_VISION_LAYERS_HPP_
 
+#include <opencv2/opencv.hpp>
 #include <leveldb/db.h>
 #include <pthread.h>
 
@@ -827,15 +828,70 @@ namespace caffe
   };
 
   template<typename Dtype>
-  class PatchCodeLayer : public Layer<Dtype>
+  class PatchLayer : public Layer<Dtype>
   {
      public:
-      explicit PatchCodeLayer(const LayerParameter& param);
+      explicit PatchLayer(const LayerParameter& param);
 
-      ~PatchCodeLayer()
+      virtual ~PatchLayer()
       {
-        if(tmp_data_)
-          free(tmp_data_);
+        if (tmp_)
+          free(tmp_);
+      }
+
+      virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+                         vector<Blob<Dtype>*>* top);
+
+     protected:
+      virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+      virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+      /*
+       virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+       vector<Blob<Dtype>*>* top);
+       virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+       const bool propagate_down,
+       vector<Blob<Dtype>*>* bottom);
+       */
+
+      virtual void forward_patch(const cv::Mat& img, float* const top);
+
+      int img_height_;
+      int img_width_;
+      int img_channels_;
+      int img_size_;
+
+      int patch_height_;
+      int patch_width_;
+      int patch_channels_;
+      int patch_size_;
+
+      uint32_t dsift_step_;
+      vector<uint32_t> dsift_sizes_;
+      uint32_t dsift_std_size_;
+      vector<int> dsift_off_;
+      vector<uint32_t> dsift_num_patches_;
+      int all_num_patches_;
+      vector<int> dsift_start_x_;
+      vector<int> dsift_start_y_;
+      vector<int> dsift_end_x_;
+      vector<int> dsift_end_y_;
+
+      cv::Mat tmpimg_;
+      float* tmp_;
+  };
+
+  template<typename Dtype>
+  class LLCCodeLayer : public Layer<Dtype>
+  {
+     public:
+      explicit LLCCodeLayer(const LayerParameter& param);
+
+      virtual ~LLCCodeLayer()
+      {
+        ;
       }
 
       virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
@@ -859,16 +915,29 @@ namespace caffe
       int img_width_;
       int img_channels_;
       int img_size_;
+
+      int patch_height_;
+      int patch_width_;
+      int patch_channels_;
+      int patch_size_;
+
       uint32_t dsift_step_;
       vector<uint32_t> dsift_sizes_;
       uint32_t dsift_std_size_;
       vector<int> dsift_off_;
       vector<uint32_t> dsift_num_patches_;
+      int all_num_patches_;
+      vector<int> dsift_start_x_;
+      vector<int> dsift_start_y_;
+      vector<int> dsift_end_x_;
+      vector<int> dsift_end_y_;
 
       EYE::LLC llc_model_;
       EYE::DSift dsift_model_;
+      int llc_dim_;
 
-      Dtype* tmp_data_;
+      cv::Mat tmpimg_;
+      cv::Mat grayimg_;
   };
 
   /*

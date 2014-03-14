@@ -127,9 +127,13 @@ namespace caffe
     {
       return new LLCDataSVMLayer<Dtype>(param);
     }
-    else if (type == "ddnet_data")
+    else if (type == "patch")
     {
-      return new DDNetDataLayer<Dtype>(param);
+      return new PatchLayer<Dtype>(param);
+    }
+    else if (type == "llc_code")
+    {
+      return new LLCCodeLayer<Dtype>(param);
     }
     else
     {
