@@ -23,19 +23,20 @@ using std::endl;
 
 namespace caffe
 {
-
   template<typename Dtype>
-  void* LLCDataSVMLayerPrefetch(void* layer_pointer)
+  void* LLCDataFTLayerPrefetch(void* layer_pointer)
   {
     CHECK(layer_pointer);
-    LLCDataSVMLayer<Dtype>* layer =
-        reinterpret_cast<LLCDataSVMLayer<Dtype>*>(layer_pointer);
+    LLCDataFTLayer<Dtype>* layer =
+        reinterpret_cast<LLCDataFTLayer<Dtype>*>(layer_pointer);
     CHECK(layer);
     Datum datum;
-    CHECK(layer->prefetch_llc_code_);
-    Dtype* top_llc_code = layer->prefetch_llc_code_->mutable_cpu_data();
-    Dtype* top_label = layer->prefetch_label_->mutable_cpu_data();
+    CHECK(layer->prefetch_patch_data_);
+    CHECK(layer->prefetch_llc_patch_pos_);
+    CHECK(layer->prefetch_label_);
+    Dtype* top_patch_data = layer->prefetch_patch_data_->mutable_cpu_data();
     Dtype* top_patch_pos = layer->prefetch_llc_patch_pos_->mutable_cpu_data();
+    Dtype* top_label = layer->prefetch_label_->mutable_cpu_data();
 
     const Dtype scale = layer->layer_param_.scale();
     const int batchsize = layer->layer_param_.batchsize();
@@ -58,16 +59,6 @@ namespace caffe
     const int patch_size = layer->patch_size_;
     const int num_patch = layer->num_patch_;
 
-    // check num_patch is a power of 4
-    {
-      int tmp = num_patch;
-      while (tmp != 0 && tmp != 1)
-      {
-        tmp = tmp >> 2;
-      }
-      CHECK_EQ(tmp, 1)<< "num patch should be a power of 4";
-    }
-
     // patch setting
     const int llc_dim = layer->llc_dim_;
 
@@ -81,108 +72,32 @@ namespace caffe
       CHECK(layer->iter_);
       CHECK(layer->iter_->Valid());
       datum.ParseFromString(layer->iter_->value().ToString());
-      const int label = datum.label() + 1;
-      const string& data = datum.data();
+      const int label = datum.label();
       const string& imgname = datum.img_name();
 
       //LOG(INFO)<< imgname << " " << label;
-      /*
-       if (cropsize)
-       {
-       CHECK(data.size()) << "Image cropping only support uint8 data";
-       int h_off, w_off;
-       // We only do random crop when we do training.
-       if (Caffe::phase() == Caffe::TRAIN)
-       {
-       h_off = rand() % (height - cropsize);
-       w_off = rand() % (width - cropsize);
-       } else
-       {
-       h_off = (height - cropsize) / 2;
-       w_off = (width - cropsize) / 2;
-       }
-       if (mirror && rand() % 2)
-       {
-       // Copy mirrored version
-       for (int c = 0; c < channels; ++c)
-       {
-       for (int h = 0; h < cropsize; ++h)
-       {
-       for (int w = 0; w < cropsize; ++w)
-       {
-       top_data[((itemid * channels + c) * cropsize + h) * cropsize
-       + cropsize - 1 - w] =
-       (static_cast<Dtype>((uint8_t) data[(c * height + h + h_off)
-       * width + w + w_off])
-       - mean[(c * height + h + h_off) * width + w + w_off])
-       * scale;
-       }
-       }
-       }
-       } else
-       {
-       // Normal copy
-       for (int c = 0; c < channels; ++c)
-       {
-       for (int h = 0; h < cropsize; ++h)
-       {
-       for (int w = 0; w < cropsize; ++w)
-       {
-       top_data[((itemid * channels + c) * cropsize + h) * cropsize
-       + w] = (static_cast<Dtype>((uint8_t) data[(c * height + h
-       + h_off) * width + w + w_off])
-       - mean[(c * height + h + h_off) * width + w + w_off])
-       * scale;
-       }
-       }
-       }
-       }
-       } else
-       {
-       // we will prefer to use data() first, and then try float_data()
-       if (data.size())
-       {
-       for (int j = 0; j < img_size; ++j)
-       {
-       top_data[imgid * img_size + j] =
-       (static_cast<Dtype>((uint8_t) data[j]) - mean[j]) * scale;
-       }
-       } else
-       {
-       for (int j = 0; j < img_size; ++j)
-       {
-       top_data[imgid * img_size + j] = (datum.float_data(j) - mean[j])
-       * scale;
-       }
-       }
-       }*/
 
       // fetch label
       top_label[imgid] = label;
 
+      const int data_start = imgid * num_patch * patch_size;
       const int patch_pos_start = imgid * num_patch * 2;
-      const int llc_code_start = imgid * num_patch * llc_dim;
 
       for (int pid = 0; pid < num_patch; ++pid)
       {
-        Dtype* cur_llc_code = (top_llc_code) + llc_code_start + pid * llc_dim;
-        for (int j = 0; j < llc_dim; ++j)
+        Dtype* cur_data = top_patch_data + data_start + pid * patch_size;
+        for (int j = 0; j < patch_size; ++j)
         {
-          *(cur_llc_code + j) = static_cast<Dtype>(datum.llc_codes(
-              pid * llc_dim + j));
+          *(cur_data + j) = static_cast<Dtype>(datum.patch_data(
+              pid * patch_size + j));
         }
-
-        // normalize llc code to one
-        const float norm1 = cblas_sasum(llc_dim,
-                                        reinterpret_cast<float*>(cur_llc_code),
-                                        1);
-        cblas_sscal(llc_dim, 1.0 / norm1,
-                    reinterpret_cast<float*>(cur_llc_code), 1);
 
         // fetch patch position
         Dtype* cur_patch_pos = top_patch_pos + patch_pos_start + pid * 2;
-        *cur_patch_pos = datum.llc_xid(pid);
-        *(cur_patch_pos + 1) = datum.llc_yid(pid);
+        for (int j = 0; j < 2; ++j)
+        {
+          *(cur_patch_pos + j) = static_cast<Dtype>(datum.llc_pos(pid * 2 + j));
+        }
       }
 
       // go to the next iter
@@ -198,19 +113,19 @@ namespace caffe
   }
 
   template<typename Dtype>
-  LLCDataSVMLayer<Dtype>::~LLCDataSVMLayer<Dtype>()
+  LLCDataFTLayer<Dtype>::~LLCDataFTLayer<Dtype>()
   {
     // Finally, join the thread
     CHECK(!pthread_join(thread_, NULL)) << "Pthread joining failed.";
   }
 
   template<typename Dtype>
-  void LLCDataSVMLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
-                                     vector<Blob<Dtype>*>* top)
+  void LLCDataFTLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
+                                    vector<Blob<Dtype>*>* top)
   {
-    CHECK_EQ(bottom.size(), 0)<< "LLCData Layer takes no input blobs.";
-    CHECK_EQ(top->size(), 3) << "LLCData Layer takes 3 blobs as output: "
-    << "llc code, label, patch pos";
+    CHECK_EQ(bottom.size(), 0)<< "LLCDataFT Layer takes no input blobs.";
+    CHECK_EQ(top->size(), 3) << "LLCDataFT Layer takes four blobs as output: "
+    << "patch data, pos, label";
 
     // Initialize the leveldb
     leveldb::DB* db_temp;
@@ -260,41 +175,25 @@ namespace caffe
 
     const int batchsz = this->layer_param_.batchsize();
 
-    // image data
-    /*
-     int cropsize = this->layer_param_.cropsize();
-     CHECK_GT(datum_height_, cropsize);
-     CHECK_GT(datum_width_, cropsize);
-     if (cropsize > 0)
-     {
-     (*top)[0]->Reshape(batchsz, datum.channels(), cropsize, cropsize);
-     prefetch_llc_code_.reset(new Blob<Dtype>(batchsz, datum.channels(), cropsize, cropsize));
-     }
-     else
-     {
-     (*top)[0]->Reshape(batchsz, datum.channels(), datum.height(),
-     datum.width());
-     prefetch_llc_code_.reset(new Blob<Dtype>(batchsz, datum.channels(), datum.height(),
-     datum.width()));
-     }
-     */
-    (*top)[0]->Reshape(batchsz * num_patch_, llc_dim_, 1, 1);
-    prefetch_llc_code_.reset(new Blob<Dtype>(batchsz * num_patch_, llc_dim_, 1, 1));
-    LOG(INFO) << "output data size: " << (*top)[0]->num() << ","
+    (*top)[0]->Reshape(batchsz * num_patch_, datum_channels_, patch_height_,
+        patch_width_);
+    prefetch_patch_data_.reset(new Blob<Dtype>(batchsz * num_patch_, datum_channels_,
+            patch_height_, patch_width_));
+    LOG(INFO) << "output patch data size: " << (*top)[0]->num() << ","
     << (*top)[0]->channels() << "," << (*top)[0]->height() << ","
     << (*top)[0]->width();
 
-    // label
-    (*top)[1]->Reshape(batchsz, 1, 1, 1);
-    prefetch_label_.reset(new Blob<Dtype>(batchsz, 1, 1, 1));
-    LOG(INFO) << "output label size: " << (*top)[1]->num() << ","
+    // patch position
+    (*top)[1]->Reshape(batchsz * num_patch_, 2, 1, 1);
+    prefetch_llc_patch_pos_.reset(new Blob<Dtype>(batchsz * num_patch_, 2, 1, 1));
+    LOG(INFO) << "output patch position size: " << (*top)[1]->num() << ","
     << (*top)[1]->channels() << "," << (*top)[1]->height() << ","
     << (*top)[1]->width();
 
-    // patch position
-    (*top)[2]->Reshape(batchsz * num_patch_, 2, 1, 1);
-    prefetch_llc_patch_pos_.reset(new Blob<Dtype>(batchsz * num_patch_, 2, 1, 1));
-    LOG(INFO) << "output patch position size: " << (*top)[2]->num() << ","
+    // label
+    (*top)[2]->Reshape(batchsz, 1, 1, 1);
+    prefetch_label_.reset(new Blob<Dtype>(batchsz, 1, 1, 1));
+    LOG(INFO) << "output label size: " << (*top)[2]->num() << ","
     << (*top)[2]->channels() << "," << (*top)[2]->height() << ","
     << (*top)[2]->width();
 
@@ -319,79 +218,80 @@ namespace caffe
     // cpu_data calls so that the prefetch thread does not accidentally make
     // simultaneous cudaMalloc calls when the main thread is running. In some
     // GPUs this seems to cause failures if we do not so.
-    prefetch_llc_code_->mutable_cpu_data();
-    prefetch_label_->mutable_cpu_data();
+    prefetch_patch_data_->mutable_cpu_data();
     prefetch_llc_patch_pos_->mutable_cpu_data();
+    prefetch_label_->mutable_cpu_data();
     data_mean_.cpu_data();
     DLOG(INFO) << "Initializing prefetch";
-    CHECK(!pthread_create(&thread_, NULL, LLCDataSVMLayerPrefetch<Dtype>,
+    CHECK(!pthread_create(&thread_, NULL, LLCDataFTLayerPrefetch<Dtype>,
             reinterpret_cast<void*>(this))) << "Pthread execution failed.";
     DLOG(INFO) << "Prefetch initialized.";
   }
 
   template<typename Dtype>
-  void LLCDataSVMLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-                                           vector<Blob<Dtype>*>* top)
+  void LLCDataFTLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                                          vector<Blob<Dtype>*>* top)
   {
     // First, join the thread
     CHECK(!pthread_join(thread_, NULL)) << "Pthread joining failed.";
     // Copy the data
-    memcpy((*top)[0]->mutable_cpu_data(), prefetch_llc_code_->cpu_data(),
-           sizeof(Dtype) * prefetch_llc_code_->count());
-    memcpy((*top)[1]->mutable_cpu_data(), prefetch_label_->cpu_data(),
-           sizeof(Dtype) * prefetch_label_->count());
-    memcpy((*top)[2]->mutable_cpu_data(), prefetch_llc_patch_pos_->cpu_data(),
+    memcpy((*top)[0]->mutable_cpu_data(), prefetch_patch_data_->cpu_data(),
+           sizeof(Dtype) * prefetch_patch_data_->count());
+    memcpy((*top)[1]->mutable_cpu_data(), prefetch_llc_patch_pos_->cpu_data(),
            sizeof(Dtype) * prefetch_llc_patch_pos_->count());
+    memcpy((*top)[2]->mutable_cpu_data(), prefetch_label_->cpu_data(),
+           sizeof(Dtype) * prefetch_label_->count());
 
     // Start a new prefetch thread
-    CHECK(!pthread_create(&thread_, NULL, LLCDataSVMLayerPrefetch<Dtype>,
+    CHECK(!pthread_create(&thread_, NULL, LLCDataFTLayerPrefetch<Dtype>,
             reinterpret_cast<void*>(this))) << "Pthread execution failed.";
   }
 
   template<typename Dtype>
-  void LLCDataSVMLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-                                           vector<Blob<Dtype>*>* top)
+  void LLCDataFTLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                                          vector<Blob<Dtype>*>* top)
   {
     // First, join the thread
     CHECK(!pthread_join(thread_, NULL)) << "Pthread joining failed.";
     // Copy the data
     CUDA_CHECK(
         cudaMemcpy((*top)[0]->mutable_gpu_data(),
-                   prefetch_llc_code_->cpu_data(),
-                   sizeof(Dtype) * prefetch_llc_code_->count(),
+                   prefetch_patch_data_->cpu_data(),
+                   sizeof(Dtype) * prefetch_patch_data_->count(),
                    cudaMemcpyHostToDevice));
     CUDA_CHECK(
-        cudaMemcpy((*top)[1]->mutable_gpu_data(), prefetch_label_->cpu_data(),
-                   sizeof(Dtype) * prefetch_label_->count(),
-                   cudaMemcpyHostToDevice));
-    CUDA_CHECK(
-        cudaMemcpy((*top)[2]->mutable_gpu_data(),
+        cudaMemcpy((*top)[1]->mutable_gpu_data(),
                    prefetch_llc_patch_pos_->cpu_data(),
                    sizeof(Dtype) * prefetch_llc_patch_pos_->count(),
                    cudaMemcpyHostToDevice));
 
+    CUDA_CHECK(
+        cudaMemcpy((*top)[2]->mutable_gpu_data(), prefetch_label_->cpu_data(),
+                   sizeof(Dtype) * prefetch_label_->count(),
+                   cudaMemcpyHostToDevice));
+
     // Start a new prefetch thread
-    CHECK(!pthread_create(&thread_, NULL, LLCDataSVMLayerPrefetch<Dtype>,
+    CHECK(!pthread_create(&thread_, NULL, LLCDataFTLayerPrefetch<Dtype>,
             reinterpret_cast<void*>(this))) << "Pthread execution failed.";
   }
 
 // The backward operations are dummy - they do not carry any computation.
   template<typename Dtype>
-  Dtype LLCDataSVMLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
-                                             const bool propagate_down,
-                                             vector<Blob<Dtype>*>* bottom)
+  Dtype LLCDataFTLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                            const bool propagate_down,
+                                            vector<Blob<Dtype>*>* bottom)
   {
     return Dtype(0.);
   }
 
   template<typename Dtype>
-  Dtype LLCDataSVMLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
-                                             const bool propagate_down,
-                                             vector<Blob<Dtype>*>* bottom)
+  Dtype LLCDataFTLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
+                                            const bool propagate_down,
+                                            vector<Blob<Dtype>*>* bottom)
   {
     return Dtype(0.);
   }
 
-  INSTANTIATE_CLASS(LLCDataSVMLayer);
+  INSTANTIATE_CLASS(LLCDataFTLayer);
 
 }  // namespace caffe

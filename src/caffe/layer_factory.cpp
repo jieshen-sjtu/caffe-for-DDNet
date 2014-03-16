@@ -99,17 +99,21 @@ namespace caffe
     {
       return new MultinomialLogisticLossLayer<Dtype>(param);
     }
-    else if (type == "llc_data")
+    else if (type == "llc_data_ft")
     {
-      return new LLCDataLayer<Dtype>(param);
+      return new LLCDataFTLayer<Dtype>(param);
     }
     else if (type == "llc_data_unsup")
     {
       return new LLCDataUnsupLayer<Dtype>(param);
     }
-    else if (type == "llc_euclidean_loss")
+    else if (type == "llc_data_svm")
     {
-      return new LLCEuclideanLossLayer<Dtype>(param);
+      return new LLCDataSVMLayer<Dtype>(param);
+    }
+    else if (type == "l1_loss")
+    {
+      return new L1LossLayer<Dtype>(param);
     }
     else if (type == "llc_accuracy")
     {
@@ -122,10 +126,6 @@ namespace caffe
     else if (type == "svm_out")
     {
       return new SVMOutLayer<Dtype>(param);
-    }
-    else if (type == "llc_data_svm")
-    {
-      return new LLCDataSVMLayer<Dtype>(param);
     }
     else if (type == "patch")
     {

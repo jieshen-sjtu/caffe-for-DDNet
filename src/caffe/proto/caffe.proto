@@ -30,13 +30,13 @@ message Datum {
   // LLC patch data
   optional int32 llc_dim = 11;
   repeated float llc_codes = 12 [packed=true];
-
-  repeated int32 llc_xid = 13 [packed=true];
-  repeated int32 llc_yid = 14 [packed=true];
+  repeated float llc_pos = 13 [packed=true];
 
   optional int32 patch_width = 15;
   optional int32 patch_height = 16;
   optional int32 num_patch = 17;
+
+  repeated float patch_data = 18 [packed = true];
 
   optional string img_name = 20;
 }

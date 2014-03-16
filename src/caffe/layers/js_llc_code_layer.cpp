@@ -49,7 +49,7 @@ namespace caffe
     dsift_start_y_.resize(num_sz, 0);
 
     const uint32_t max_sz = *(std::max_element(dsift_sizes_.begin(),
-                                             dsift_sizes_.end()));
+                                               dsift_sizes_.end()));
     for (int i = 0; i < num_sz; ++i)
     {
       const uint32_t sz = dsift_sizes_[i];
@@ -67,7 +67,7 @@ namespace caffe
     shared_ptr<float> centers;
     uint32_t cb_dim(0), K(0);
     {
-      LOG(INFO) << "start loading the codebook...";
+      LOG(INFO)<< "start loading the codebook...";
 
       FILE* pfile = fopen(param.codebook().c_str(), "r");
 
@@ -86,7 +86,7 @@ namespace caffe
   {
     CHECK_EQ(bottom.size(), 1)<<"DDNetDataLayer takes one blob as input";
 
-    CHECK_EQ(top->size(), 2) << "DDNetDataLayer takes tw0 blobs as output";
+    CHECK_EQ(top->size(), 1) << "DDNetDataLayer takes one blob as output";
 
     img_channels_ = bottom[0]->channels();
     img_height_ = bottom[0]->height();
@@ -129,8 +129,7 @@ namespace caffe
     // LLC code
     (*top)[0]->Reshape(bottom[0]->num() * all_num_patches_, llc_dim_,
         1, 1);
-    (*top)[1]->Reshape(bottom[0]->num() * all_num_patches_, 2, 1, 1);
-
+    //(*top)[1]->Reshape(bottom[0]->num() * all_num_patches_, 2, 1, 1);
   }
 
   template<typename Dtype>
@@ -139,7 +138,7 @@ namespace caffe
   {
     const Dtype* const bottom_data = bottom[0]->cpu_data();
     Dtype* const top_data = (*top)[0]->mutable_cpu_data();
-    Dtype* const top_pos = (*top)[1]->mutable_cpu_data();
+    //Dtype* const top_pos = (*top)[1]->mutable_cpu_data();
 
     float* const tmp = (float*) tmpimg_.data;
 
@@ -156,22 +155,23 @@ namespace caffe
         tmpimg_.copyTo(grayimg_);
 
       Dtype* const cur_top = top_data + imgid * all_num_patches_ * llc_dim_;
-      Dtype* const cur_pos = top_pos + imgid * all_num_patches_ * 2;
+      //Dtype* const cur_pos = top_pos + imgid * all_num_patches_ * 2;
 
       const float* const gray_data = (const float*) grayimg_.data;
 
-      vector<VlDsiftKeypoint> frames;
+      //vector<VlDsiftKeypoint> frames;
       vector<float> descrs;
       uint32_t sift_dim(0);
-      dsift_model_.Extract(gray_data, img_width_, img_height_, &frames, &descrs,
+      dsift_model_.Extract(gray_data, img_width_, img_height_, NULL, &descrs,
                            &sift_dim);
-      llc_model_.Encode(descrs.data(), sift_dim, frames.size(),
+      llc_model_.Encode(descrs.data(), sift_dim, descrs.size() / sift_dim,
                         reinterpret_cast<float*>(cur_top));
-      for (int f = 0; f < frames.size(); ++f)
-      {
-        cur_pos[2 * f] = static_cast<Dtype>(frames[f].x);
-        cur_pos[2 * f + 1] = static_cast<Dtype>(frames[f].y);
-      }
+      /*
+       for (int f = 0; f < frames.size(); ++f)
+       {
+       cur_pos[2 * f] = static_cast<Dtype>((int) frames[f].x);
+       cur_pos[2 * f + 1] = static_cast<Dtype>((int) frames[f].y);
+       }*/
     }
   }
 
