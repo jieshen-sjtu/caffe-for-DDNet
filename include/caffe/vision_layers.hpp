@@ -1046,6 +1046,35 @@ namespace caffe
    */
 
   template<typename Dtype>
+  class ShiftLayer : public Layer<Dtype>
+  {
+     public:
+      explicit ShiftLayer(const LayerParameter& param)
+          : Layer<Dtype>(param)
+      {
+      }
+      virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+                         vector<Blob<Dtype>*>* top);
+
+     protected:
+      virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+      virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
+      virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+      virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+                                 const bool propagate_down,
+                                 vector<Blob<Dtype>*>* bottom);
+
+      // sum_multiplier is just used to carry out sum using blas
+      Blob<Dtype> sum_multiplier_;
+      // scale is an intermediate blob to hold temporary results.
+      Blob<Dtype> scale_;
+  };
+
+  template<typename Dtype>
   class L1LossLayer : public Layer<Dtype>
   {
      public:
@@ -1053,6 +1082,12 @@ namespace caffe
           : Layer<Dtype>(param),
             difference_()
       {
+        output_ = fopen("code.txt", "w");
+      }
+
+      virtual ~L1LossLayer()
+      {
+        fclose(output_);
       }
       virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
                          vector<Blob<Dtype>*>* top);
@@ -1076,6 +1111,8 @@ namespace caffe
       // virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
       //     const bool propagate_down, vector<Blob<Dtype>*>* bottom);
       Blob<Dtype> difference_;
+
+      FILE* output_;
   };
 
   template<typename Dtype>
@@ -1111,14 +1148,12 @@ namespace caffe
       explicit SPMLayer(const LayerParameter& param)
           : Layer<Dtype>(param),
             num_spm_level_(0),
-            num_patch_(0),
-            hor_pool_(false),
-            num_cell_x_y_(0),
-            finest_num_blk_(0),
-            finest_num_cell_(0),
+            feat_dim_(0),
+            img_width_(0),
+            img_height_(0),
             num_img_(0),
-            llc_dim_(0),
-            pos_dim_(0)
+            num_patch_(0),
+            spm_dim_(0)
       {
       }
       virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
@@ -1140,24 +1175,38 @@ namespace caffe
        */
 
      private:
-      void build_spm();
-
-      int num_spm_level_;
-      int num_patch_;
-      bool hor_pool_;
-
-      int num_cell_x_y_;
-      int finest_num_blk_;
-      int finest_num_cell_;
-
-      vector<int> level_start_idx_;
-      vector<int> level_num_blk_;
-      // vector<vector<int> > cell_to_patchidx_;
-      map<pair<int, int>, vector<int> > map_cell_blk_start_idx_;
+      //void build_spm();
 
       int num_img_;
-      int llc_dim_;
-      int pos_dim_;
+      int num_patch_;
+
+      int num_spm_level_;
+      int img_width_;
+      int img_height_;
+
+      int feat_dim_;
+      int spm_dim_;
+
+      EYE::SPM spm_model_;
+
+      map<uint32_t, vector<uint32_t> > map_cell_blk_;
+      map<uint32_t, vector<uint32_t> > map_blk_cell_;
+      /*
+       int num_patch_;
+       bool hor_pool_;
+
+       int num_cell_x_y_;
+       int finest_num_blk_;
+       int finest_num_cell_;
+
+       vector<int> level_start_idx_;
+       vector<int> level_num_blk_;
+       map<pair<int, int>, vector<int> > map_cell_blk_start_idx_;
+
+       int num_img_;
+       int llc_dim_;
+       int pos_dim_;*/
+
   };
 
   template<typename Dtype>

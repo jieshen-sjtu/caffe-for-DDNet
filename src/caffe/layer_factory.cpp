@@ -111,6 +111,10 @@ namespace caffe
     {
       return new LLCDataSVMLayer<Dtype>(param);
     }
+    else if (type == "shift")
+    {
+      return new ShiftLayer<Dtype>(param);
+    }
     else if (type == "l1_loss")
     {
       return new L1LossLayer<Dtype>(param);

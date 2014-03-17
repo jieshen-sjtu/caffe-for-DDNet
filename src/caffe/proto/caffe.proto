@@ -106,17 +106,13 @@ message LayerParameter {
   optional uint32 rand_skip = 53 [ default = 0 ];
 
   // for spm layer
-  optional uint32 spm_level = 54 [default = 2];
-  optional uint32 num_patch = 55 [default = 16];
-  optional bool hor_pool = 56 [default = false];
+  optional uint32 spm_level = 54 [default = 3];
+  optional uint32 img_width = 55;
+  optional uint32 img_height = 56;
 
   // for svm out layer
   optional string svm_out_file = 60;
 
-  // for PatchCodeLayer
-//  optional uint32 img_height = 70;
-//  optional uint32 img_width = 71;
-//  optional uint32 img_channels = 72;
   optional uint32 dsift_step = 73;
   repeated uint32 dsift_sizes = 74 [packed = true];
   optional uint32 dsift_std_size = 75;
