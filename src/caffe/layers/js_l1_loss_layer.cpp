@@ -51,7 +51,9 @@ namespace caffe
       grad[i] = sgn(difference[i]);
 
     //LOG(INFO) << "L1 bp";
-    for (int i = 0; i < num; ++i)
+
+    /*
+    for (int i = 0; i < 1; ++i)
     {
       for (int j = 0; j < dim; ++j)
       {
@@ -69,25 +71,7 @@ namespace caffe
       }
       cout << endl;
     }
-    /*
-    for (int i = 0; i < count; ++i)
-    {
-      cout << (*bottom)[1]->cpu_data()[i] << " ";
-      if ((i + 1) % dim == 0)
-        cout << endl;
-    }
-    for (int i = 0; i < count; ++i)
-    {
-      cout << (*bottom)[0]->cpu_data()[i] << " ";
-      if ((i + 1) % dim == 0)
-        cout << endl;
-    }
-    for (int i = 0; i < count; ++i)
-    {
-      cout << grad[i] << " ";
-      if ((i + 1) % dim == 0)
-        cout << endl;
-    }*/
+    */
 
     cblas_sscal(count, 1.0 / num, grad, 1);
 

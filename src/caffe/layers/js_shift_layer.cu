@@ -8,14 +8,18 @@
 #include <algorithm>
 #include <cfloat>
 #include <vector>
+#include <iostream>
 #include <thrust/device_vector.h>
+#include <cstdlib>
+#include <cstring>
 
 #include "caffe/layer.hpp"
 #include "caffe/vision_layers.hpp"
 #include "caffe/util/math_functions.hpp"
 
 using std::max;
-
+using std::cout;
+using std::endl;
 namespace caffe
 {
 
@@ -27,6 +31,7 @@ namespace caffe
     CHECK_EQ(top->size(), 1) << "Shift Layer takes a single blob as output.";
     (*top)[0]->Reshape(bottom[0]->num(), bottom[0]->channels(),
         bottom[0]->height(), bottom[0]->width());
+
     sum_multiplier_.Reshape(1, bottom[0]->channels(),
         bottom[0]->height(), bottom[0]->width());
     Dtype* multiplier_data = sum_multiplier_.mutable_cpu_data();
@@ -34,6 +39,7 @@ namespace caffe
     {
       multiplier_data[i] = 1.;
     }
+
     scale_.Reshape(bottom[0]->num(), 1, 1, 1);
   }
 
@@ -47,13 +53,58 @@ namespace caffe
     int num = bottom[0]->num();
     int dim = bottom[0]->count() / bottom[0]->num();
 
-    caffe_cpu_gemv<Dtype>(CblasNoTrans, num, dim, 1., bottom_data,
-                          sum_multiplier_.cpu_data(), 0., scale_data);
-    // Do division
     memcpy(top_data, bottom_data, sizeof(Dtype) * bottom[0]->count());
+
+    // we need to subtract the max to avoid numerical issues
+    for (int i = 0; i < num; ++i)
+    {
+      scale_data[i] = bottom_data[i * dim];
+      for (int j = 0; j < dim; ++j)
+      {
+        scale_data[i] = max(scale_data[i], bottom_data[i * dim + j]);
+      }
+
+      caffe_scal<Dtype>(dim, 1.0 / scale_data[i], top_data + i * dim);
+    }
+
+    caffe_cpu_gemv<Dtype>(CblasNoTrans, num, dim, 1., top_data,
+                          sum_multiplier_.cpu_data(), 0., scale_data);
+
+    // Do division
+
+    //std::cout << "ver" << endl;
     for (int i = 0; i < num; ++i)
     {
       caffe_scal<Dtype>(dim, Dtype(1.) / scale_data[i], top_data + i * dim);
+    }
+    //std::cout << endl;
+    /*
+     for (int i = 0; i < num; ++i)
+     {
+     cout << "forward sample " << i << endl;
+     for (int j = 0; j < dim; ++j)
+     cout << bottom_data[i * dim + j] << " ";
+     cout << endl;
+     for (int j = 0; j < dim; ++j)
+     cout << top_data[i * dim + j] << " ";
+     cout << endl;
+     }
+     */
+  }
+
+  template <typename Dtype>
+  __global__ void kernel_get_max(const int num, const int dim,
+      const Dtype* data, Dtype* out)
+  {
+    int index = threadIdx.x + blockIdx.x * blockDim.x;
+    if (index < num)
+    {
+      Dtype maxval = -FLT_MAX;
+      for (int i = 0; i < dim; ++i)
+      {
+        maxval = max(data[index * dim + i], maxval);
+      }
+      out[index] = maxval;
     }
   }
 
@@ -73,34 +124,45 @@ namespace caffe
   void ShiftLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
                                       vector<Blob<Dtype>*>* top)
   {
+
     const Dtype* bottom_data = bottom[0]->gpu_data();
     Dtype* top_data = (*top)[0]->mutable_gpu_data();
     Dtype* scale_data = scale_.mutable_gpu_data();
     int num = bottom[0]->num();
     int dim = bottom[0]->count() / bottom[0]->num();
 
-    // sum after exp
-    caffe_gpu_gemv<Dtype>(CblasNoTrans, num, dim, 1., bottom_data,
-                          sum_multiplier_.gpu_data(), 0., scale_data);
-
-    // Do division
-
     CUDA_CHECK(
         cudaMemcpy(top_data, bottom_data, sizeof(Dtype) * bottom[0]->count(),
                    cudaMemcpyDeviceToDevice));
+
+    // we need to subtract the max to avoid numerical issues
+    kernel_get_max<Dtype><<<CAFFE_GET_BLOCKS(num), CAFFE_CUDA_NUM_THREADS>>>(
+        num, dim, bottom_data, scale_data);
+
+    kernel_shift_div<Dtype><<<CAFFE_GET_BLOCKS(num * dim), CAFFE_CUDA_NUM_THREADS>>>(
+        num, dim, scale_data, top_data);
+
+    // sum
+    caffe_gpu_gemv<Dtype>(CblasNoTrans, num, dim, 1., top_data,
+                          sum_multiplier_.gpu_data(), 0., scale_data);
+
+    // Do division
 
   kernel_shift_div<Dtype><<<CAFFE_GET_BLOCKS(num * dim), CAFFE_CUDA_NUM_THREADS>>>(
       num, dim, scale_data, top_data);
 
   /*
-   LOG(INFO) << "scale count: " << scale_.count();
-   for (int i = 0; i < num; ++i)
+   for (int i = 0; i < 1; ++i)
    {
-   LOG(INFO)<<i<<" "<<scale_data[i];
-   caffe_gpu_scal<Dtype>(dim, Dtype(1.) / scale_data[i], top_data + i * dim);
+   cout << "forward sample " << i << endl;
+   for (int j = 0; j < dim; ++j)
+   cout << bottom[0]->cpu_data()[i * dim + j] << " ";
+   cout << endl;
+   for (int j = 0; j < dim; ++j)
+   cout << (*top)[0]->cpu_data()[i * dim + j] << " ";
+   cout << endl;
    }
    */
-
 }
 
 template<typename Dtype>
@@ -113,8 +175,10 @@ Dtype ShiftLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   const Dtype* bottom_data = (*bottom)[0]->cpu_data();
   Dtype* bottom_diff = (*bottom)[0]->mutable_cpu_diff();
   Dtype* scale_data = scale_.mutable_cpu_data();
+
   int num = top[0]->num();
   int dim = top[0]->count() / top[0]->num();
+
   memcpy(bottom_diff, top_diff, sizeof(Dtype) * top[0]->count());
   // Compute inner1d(top_diff, top_data) and subtract them from the bottom diff
   for (int i = 0; i < num; ++i)
@@ -123,16 +187,34 @@ Dtype ShiftLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
                                          top_data + i * dim);
   }
   // subtraction
+
   caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num, dim, 1, -1.,
                         scale_data, sum_multiplier_.cpu_data(), 1.,
                         bottom_diff);
   // elementwise multiplication
+
   caffe_cpu_gemv<Dtype>(CblasNoTrans, num, dim, 1., bottom_data,
                         sum_multiplier_.cpu_data(), 0., scale_data);
+
   for (int i = 0; i < num; ++i)
   {
     caffe_scal<Dtype>(dim, Dtype(1.) / scale_data[i], bottom_diff + i * dim);
   }
+  /*
+   for (int i = 0; i < num; ++i)
+   {
+   cout << "backward sample " << i << endl;
+   for (int j = 0; j < dim; ++j)
+   cout << top_data[i * dim + j] << " ";
+   cout << endl;
+   for (int j = 0; j < dim; ++j)
+   cout << top_diff[i * dim + j] << " ";
+   cout << endl;
+   for (int j = 0; j < dim; ++j)
+   cout << bottom_diff[i * dim + j] << " ";
+   cout << endl;
+   }
+   */
   return Dtype(0);
 }
 
@@ -155,32 +237,45 @@ Dtype ShiftLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   // mode
   CUBLAS_CHECK(
       cublasSetPointerMode(Caffe::cublas_handle(), CUBLAS_POINTER_MODE_DEVICE));
+
   Dtype* scale_data = scale_.mutable_gpu_data();
   for (int i = 0; i < num; ++i)
   {
     caffe_gpu_dot<Dtype>(dim, top_diff + i * dim, top_data + i * dim,
                          scale_data + i);
   }
+
   CUBLAS_CHECK(
       cublasSetPointerMode(Caffe::cublas_handle(), CUBLAS_POINTER_MODE_HOST));
   // subtraction
   caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num, dim, 1, -1.,
                         scale_.gpu_data(), sum_multiplier_.gpu_data(), 1.,
                         bottom_diff);
-  // elementwise multiplication
+
   caffe_gpu_gemv<Dtype>(CblasNoTrans, num, dim, 1., bottom_data,
                         sum_multiplier_.gpu_data(), 0., scale_data);
 
   kernel_shift_div<Dtype><<<CAFFE_GET_BLOCKS(num * dim), CAFFE_CUDA_NUM_THREADS>>>(
       num, dim, scale_data, bottom_diff);
-  /*
-   for (int i = 0; i < num; ++i)
-   {
-   caffe_gpu_scal<Dtype>(dim, Dtype(1.) / scale_data[i],
-   bottom_diff + i * dim);
-   }
 
-  LOG(INFO)<<"shift gpu bp done";*/
+  for (int i = 0; i < 1; ++i)
+  {
+    cout << "backward sample " << i << endl;
+    cout << "top data" << endl;
+    for (int j = 0; j < dim; ++j)
+      cout << top[0]->cpu_data()[i * dim + j] << " ";
+    cout << endl << "top diff" << endl;
+    for (int j = 0; j < dim; ++j)
+      cout << top[0]->cpu_diff()[i * dim + j] << " ";
+    cout << endl << "bottom data" << endl;
+    for (int j = 0; j < dim; ++j)
+      cout << (*bottom)[0]->cpu_data()[i * dim + j] << " ";
+    cout << endl << "bottom diff" << endl;
+    for (int j = 0; j < dim; ++j)
+      cout << (*bottom)[0]->cpu_diff()[i * dim + j] << " ";
+    cout << endl;
+  }
+
   return Dtype(0);
 }
 

@@ -1052,6 +1052,23 @@ namespace caffe
       explicit ShiftLayer(const LayerParameter& param)
           : Layer<Dtype>(param)
       {
+        /*
+         scale_ = NULL;
+         all_one_ = NULL;
+         sum_top_dif_data_ = NULL;
+         */
+      }
+      virtual ~ShiftLayer()
+      {
+        /*
+         if (scale_)
+         free(scale_);
+         if (all_one_)
+         free(all_one_);
+         if (sum_top_dif_data_)
+         free(sum_top_dif_data_);
+         */
+        ;
       }
       virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
                          vector<Blob<Dtype>*>* top);
@@ -1059,11 +1076,12 @@ namespace caffe
      protected:
       virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
                                vector<Blob<Dtype>*>* top);
-      virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-                               vector<Blob<Dtype>*>* top);
+
       virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
                                  const bool propagate_down,
                                  vector<Blob<Dtype>*>* bottom);
+      virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                               vector<Blob<Dtype>*>* top);
       virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
                                  const bool propagate_down,
                                  vector<Blob<Dtype>*>* bottom);
@@ -1238,6 +1256,96 @@ namespace caffe
       FILE* output_;
   };
 
+/*
+ template<typename Dtype>
+ void* ZJQDataLayerPrefetch(void* layer_pointer);
+
+ template<typename Dtype>
+ class ZJQDataLayer : public Layer<Dtype>
+ {
+ // The function used to perform prefetching.
+ friend void* ZJQDataLayerPrefetch<Dtype>(void* layer_pointer);
+
+ public:
+ explicit ZJQDataLayer(const LayerParameter& param)
+ : Layer<Dtype>(param)
+ {
+ }
+ virtual ~ZJQDataLayer();
+ virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+ vector<Blob<Dtype>*>* top);
+
+ protected:
+ virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+ vector<Blob<Dtype>*>* top);
+ virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+ vector<Blob<Dtype>*>* top);
+ virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+ const bool propagate_down,
+ vector<Blob<Dtype>*>* bottom);
+ virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+ const bool propagate_down,
+ vector<Blob<Dtype>*>* bottom);
+
+ shared_ptr<leveldb::DB> db_;
+ shared_ptr<leveldb::Iterator> iter_;
+ int datum_channels_;
+ int datum_height_;
+ int datum_width_;
+ int datum_size_;
+
+ int num_multi_label_;
+ int num_context_;
+
+ pthread_t thread_;
+ shared_ptr<Blob<Dtype> > prefetch_data_;
+ shared_ptr<Blob<Dtype> > prefetch_multi_label_;
+ shared_ptr<Blob<Dtype> > prefetch_context_;
+ Blob<Dtype> data_mean_;
+ };
+
+ template<typename Dtype>
+ class ZJQContextLayer : public Layer<Dtype>
+ {
+ public:
+ explicit ZJQContextLayer(const LayerParameter& param)
+ : Layer<Dtype>(param),
+ num_feat_map_(0),
+ height_(0),
+ width_(0),
+ context_dim_(0)
+ {
+ }
+ virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
+ vector<Blob<Dtype>*>* top);
+
+ protected:
+ virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+ vector<Blob<Dtype>*>* top);
+ virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+ vector<Blob<Dtype>*>* top);
+
+ virtual Dtype Backward_cpu(const vector<Blob<Dtype>*>& top,
+ const bool propagate_down,
+ vector<Blob<Dtype>*>* bottom);
+ virtual Dtype Backward_gpu(const vector<Blob<Dtype>*>& top,
+ const bool propagate_down,
+ vector<Blob<Dtype>*>* bottom);
+
+ int num_feat_map_;
+ int height_;
+ int width_;
+
+ int context_dim_;
+ Blob<Dtype> w_multi_context_;
+ Blob<Dtype> all_ones_;
+ Blob<Dtype> all_ones_sample_;
+ Blob<Dtype> tmp_;
+
+ Blob<Dtype> bias_;
+ shared_ptr<SyncedMemory> bias_multiplier_;
+ };
+ */
 }  // namespace caffe
 
 #endif  // CAFFE_VISION_LAYERS_HPP_
